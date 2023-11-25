@@ -82,7 +82,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
     /**
      * @notice This returns the latest USD value for gold using the price feed oracle.
      * @param _fingerprint Product fingerprint to fetch GoldBar metadata.
-     * @return Returns USD price per gram, premium fee, and tokization cost.
+     * @return Returns USD price for grams of gold.
      */
     function _latestAnswer(uint256 _fingerprint) internal view returns (uint256) {
         require(goldBars[_fingerprint].grams != 0, "fingerprint must exist");
@@ -94,7 +94,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
 
         uint256 priceForGrams = ((toDecimals(goldBars[_fingerprint].grams, 0, _decimals()) *
             uint256(price)) / toDecimals(unz, uint8(7), _decimals()));
-        return (priceForGrams);
+        return priceForGrams;
     }
 
     /**
@@ -152,9 +152,10 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
      * @param _fingerprint Product that is decrementing in stock.
      */
     function decrementSellStock(uint256 _fingerprint) external override onlyFactory {
-        require(goldBars[_fingerprint].weSellAtStock != 0, "Already zero sell");
+        GoldBar storage gb = goldBars[_fingerprint];
+        require(gb.weSellAtStock != 0, "Already zero sell");
         unchecked {
-            goldBars[_fingerprint].weSellAtStock--;
+            gb.weSellAtStock--;
         }
     }
 
@@ -216,7 +217,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
             uint256[] memory tokenizationCost
         )
     {
-        bool useFingerprint = _fingerprints.length == 0 ? false : true;
+        bool useFingerprint = !(_fingerprints.length == 0);
         uint256 length = useFingerprint ? _fingerprints.length : _tokenIds.length;
         weSellAt = new uint256[](length);
         weSellAtStock = new uint256[](length);
@@ -328,8 +329,11 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
         uint256 length = fingerprints.length;
         currency = currencyISONum;
 
-        for (uint256 i; i < length; i++) {
+        for (uint256 i; i < length;) {
             nativePrice += goldBars[fingerprints[i]].grams;
+            unchecked {
+                ++i;
+            }
         }
     }
 

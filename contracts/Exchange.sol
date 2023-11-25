@@ -5,8 +5,8 @@ import "./abstract/FactoryModifiers.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/IExchange.sol";
-
-import "./exchangeInterfaces/IPearlRouter.sol";
+import "./interfaces/ITNGBLV3Oracle.sol";
+import "../pearl-v2/contracts/interfaces/periphery/ISwapRouter.sol";
 
 /**
  * @title Exchange
@@ -16,19 +16,33 @@ import "./exchangeInterfaces/IPearlRouter.sol";
 contract ExchangeV2 is IExchange, FactoryModifiers {
     using SafeERC20 for IERC20;
 
+    struct SwapRouter {
+        address swap;
+        uint24 fee;
+        uint32 secondsAgo;
+    }
+
+    // ~ Constants ~
+
+    // Default seconds ago for the oracle
+    uint32 public constant DEFAULT_SECONDS_AGO = 10;
+
     // ~ State Variables ~
 
-    /// @notice Mapping of concatenated pairs to router address.
-    mapping(bytes => address) public routers;
+    /// @notice Mapping of concatenated pairs to SwapRouter data used on pair pool, UniV3.
+    mapping(bytes => SwapRouter) public routers;
 
-    /// @notice TODO
-    mapping(bytes => IRouter.Route[]) public routePaths;
+    /// @notice UniV3 oracle.
+    ITNGBLV3Oracle public oracle;
 
-    /// @notice TODO
-    mapping(bytes => bool) public simpleSwap;
+    // ~ Events ~
 
-    /// @notice TODO
-    mapping(bytes => bool) public stable;
+    /**
+     * 
+     * @param oracle_new New oracle address.
+     * @param oracle_old Old oracle address.
+     */
+    event OracleChanged(address indexed oracle_new, address indexed oracle_old);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -41,48 +55,72 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
      * @notice Initializes the Exchange contract
      * @param _factory Address for the  Factory contract.
      */
-    function initialize(address _factory) external initializer {
+    function initialize(address _factory, address _oracle) external initializer {
         __FactoryModifiers_init(_factory);
+        require(_oracle != address(0), "ZA 0");
+        emit OracleChanged(_oracle, address(oracle));
+        oracle = ITNGBLV3Oracle(_oracle);
     }
 
     // ~ External Funcions ~
 
     /**
-     * @notice This function allows the factory owner to add a new router address to a supported pair.
+     * @notice This function allows the factory owner to add a new pair to exchange.
      * @param tokenInAddress Address of Erc20 token we're exchanging from.
      * @param tokenOutAddress Address of Erc20 token we're exchanging to.
-     * @param _router Address of router.
+     * @param _swapRouter Address of the swap router.
+     * @param _fee Fee used on pair pool, UniV3.
+     * @param _secondsAgo Seconds ago for the oracle.
      */
-    function addRouterForTokens(
+    function addFeesTokens(
         address tokenInAddress,
         address tokenOutAddress,
-        address _router,
-        IRouter.Route[] calldata _routes,
-        IRouter.Route[] calldata _routesReversed,
-        bool _simpleSwap,
-        bool _stable
+        address _swapRouter,
+        uint24 _fee,
+        uint32 _secondsAgo
     ) external onlyFactoryOwner {
-        require(_routes.length == _routesReversed.length, "mismatch");
+        require(tokenInAddress != tokenOutAddress, "same token");
+        require(_fee == oracle.POOL_FEE_001() || _fee == oracle.POOL_FEE_005() || _fee == oracle.POOL_FEE_03() || _fee == oracle.POOL_FEE_1(), "invalid fee");
+        
         bytes memory tokenized = abi.encodePacked(tokenInAddress, tokenOutAddress);
         bytes memory tokenizedReverse = abi.encodePacked(tokenOutAddress, tokenInAddress);
-        // set routes
-        routers[tokenized] = _router;
-        routers[tokenizedReverse] = _router;
-        // set paths if any
-        uint256 length = _routes.length;
-        for (uint256 i; i < length; ) {
-            routePaths[tokenized].push(_routes[i]);
-            routePaths[tokenizedReverse].push(_routesReversed[i]);
-            unchecked {
-                ++i;
+        // set fees
+        SwapRouter memory swapRouter = SwapRouter(
+            {
+                swap: _swapRouter,
+                fee: _fee,
+                secondsAgo: _secondsAgo
             }
-        }
-        // set if simple swap or with hops
-        simpleSwap[tokenized] = _simpleSwap;
-        simpleSwap[tokenizedReverse] = _simpleSwap;
-        //set if pool is stable or not
-        stable[tokenized] = _stable;
-        stable[tokenizedReverse] = _stable;
+        );
+        routers[tokenized] = swapRouter;
+        routers[tokenizedReverse] = swapRouter;
+        
+    }
+
+    /**
+     * @notice This function allows the factory owner change oracle address.
+     * @param _oracle Address of the new oracle.
+     */
+    function setOracle(address _oracle) external onlyFactoryOwner {
+        require(_oracle != address(0), "ZA 0");
+        emit OracleChanged(_oracle, address(oracle));
+        oracle = ITNGBLV3Oracle(_oracle);
+    }
+
+    /**
+     * @notice This functions updates seconds ago for a pair.
+     * @param tokenInAddress token in address
+     * @param tokenOutAddress token out address
+     * @param _secondsAgo  seconds ago used for the oracle
+     */
+    function setSecondsAgo(address tokenInAddress, address tokenOutAddress, uint32 _secondsAgo) external onlyFactoryOwner {
+        require(tokenInAddress != tokenOutAddress, "same token");
+        bytes memory tokenized = abi.encodePacked(tokenInAddress, tokenOutAddress);
+        bytes memory tokenizedReverse = abi.encodePacked(tokenOutAddress, tokenInAddress);
+        SwapRouter memory swapRouter = routers[tokenized];
+        swapRouter.secondsAgo = _secondsAgo;
+        routers[tokenized] = swapRouter;
+        routers[tokenizedReverse] = swapRouter;
     }
 
     /**
@@ -91,47 +129,38 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
      * @param tokenOut Address of Erc20 token being given to the owner.
      * @param amountIn Amount of `tokenIn` to be exchanged.
      * @param minAmountOut The minimum amount expected from `tokenOut`.
-     * @return Amount of returned `tokenOut` tokens.
+     * @return amountOut Amount of returned `tokenOut` tokens.
      */
     function exchange(
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
         uint256 minAmountOut
-    ) external returns (uint256) {
-        uint256[] memory amounts = new uint256[](2);
-
+    ) external returns (uint256 amountOut) {
         bytes memory tokenized = abi.encodePacked(tokenIn, tokenOut);
 
-        address _router = routers[tokenized];
-        require(address(0) != _router, "router 0 ng");
+        SwapRouter storage swapRouter = routers[tokenized];
+
+        require(swapRouter.swap != address(0), "router 0 ng");
         //take the token
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         //approve the router
-        IERC20(tokenIn).approve(_router, amountIn);
+        IERC20(tokenIn).approve(swapRouter.swap, amountIn);
 
-        if (simpleSwap[tokenized]) {
-            amounts = IRouter(_router).swapExactTokensForTokensSimple(
-                amountIn,
-                minAmountOut,
-                tokenIn,
-                tokenOut,
-                stable[tokenized],
-                msg.sender,
-                block.timestamp
-            );
-        } else {
-            amounts = new uint256[](routePaths[tokenized].length);
-            amounts = IRouter(_router).swapExactTokensForTokens(
-                amountIn,
-                minAmountOut,
-                routePaths[tokenized],
-                msg.sender,
-                block.timestamp
-            );
-        }
+        //swap
+        amountOut = ISwapRouter(swapRouter.swap).exactInputSingle(
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: swapRouter.fee,
+                recipient: msg.sender,
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: minAmountOut,
+                sqrtPriceLimitX96: 0
+            })
+        );
 
-        return amounts[amounts.length - 1]; //returns output token amount
     }
 
     /**
@@ -139,26 +168,22 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
      * @param tokenIn Address of Erc20 token being token from owner.
      * @param tokenOut Address of Erc20 token being given to the owner.
      * @param amountIn Amount of `tokenIn` to be exchanged.
-     * @return Amount of `tokenOut` tokens for quote.
+     * @return amountOut Amount of `tokenOut` tokens for quote.
      */
     function quoteOut(
         address tokenIn,
         address tokenOut,
         uint256 amountIn
-    ) external view returns (uint256) {
-        uint256[] memory amounts = new uint256[](2);
-
+    ) external view returns (uint256 amountOut) {
+        
         bytes memory tokenized = abi.encodePacked(tokenIn, tokenOut);
-        address _router = routers[tokenized];
-        require(address(0) != _router, "router 0 qo");
-
-        if (simpleSwap[tokenized]) {
-            (amounts[1], ) = IRouter(_router).getAmountOut(amountIn, tokenIn, tokenOut);
-        } else {
-            amounts = new uint256[](routePaths[tokenized].length);
-            amounts = IRouter(_router).getAmountsOut(amountIn, routePaths[tokenized]);
+        SwapRouter memory swapRouter = routers[tokenized];
+        
+        require(swapRouter.swap != address(0), "router 0 ng");
+        if(swapRouter.secondsAgo == 0) {
+            swapRouter.secondsAgo = DEFAULT_SECONDS_AGO;
         }
 
-        return amounts[amounts.length - 1];
+        amountOut = oracle.consultWithFee(tokenIn, uint128(amountIn), tokenOut, swapRouter.secondsAgo, swapRouter.fee);
     }
 }

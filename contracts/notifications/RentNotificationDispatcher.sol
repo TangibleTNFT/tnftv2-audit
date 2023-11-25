@@ -60,11 +60,12 @@ contract RentNotificationDispatcher is IRentNotificationDispatcher, Notification
         uint256 endTime
     ) external onlyTnftRentManager {
         // if in if to save gas in case nothing registered
-        if (_tnft == address(tnft())) {
-            address receiver = registeredForNotification(address(tnft()), tokenId);
+        address localTnft = address(tnft());
+        if (_tnft == localTnft) {
+            address receiver = registeredForNotification(localTnft, tokenId);
             if (receiver != address(0)) {
                 IRentNotificationReceiver(receiver).notify(
-                    address(tnft()),
+                    localTnft,
                     tokenId,
                     unclaimedAmount,
                     newDeposit,

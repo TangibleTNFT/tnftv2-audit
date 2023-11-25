@@ -45,6 +45,7 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
         address _tnft
     ) internal onlyInitializing {
         __FactoryModifiers_init(_factory);
+        require(_tnft != address(0), "TNFT 0");
         NotificationWhitelisterStorage storage $ = _getNotificationWhitelisterStorage();
         $.tnft = ITangibleNFT(_tnft);
     }

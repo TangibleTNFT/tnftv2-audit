@@ -70,8 +70,11 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     /// @notice Mapping to map the payment wallet of category owner.
     mapping(address => address) public categoryOwnerPaymentAddress;
 
-    /// @notice Maps category string to TNFT contract address.
+    /// @notice Maps category name to TNFT contract address.
     mapping(string => ITangibleNFT) public category;
+
+    /// @notice Maps category symbol to TNFT contract address.
+    mapping(string => ITangibleNFT) public categorySymbol;
 
     /// @notice Mapping of TNFT contract to RentManager contract.
     mapping(ITangibleNFT => IRentManager) public rentManager;
@@ -195,7 +198,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     /// @notice Modifier used to verify function caller is the marketplace or Tangible multisig.
     modifier onlyLabsOrMarketplace() {
         require(
-            (tangibleLabs == msg.sender) || (marketplace == msg.sender),
+            tangibleLabs == msg.sender || marketplace == msg.sender,
             "Factory: caller is not the labs nor marketplace"
         );
         _;
@@ -240,7 +243,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      * @param _tangibleLabs Tangible multisig address.
      */
     function initialize(address _defaultUSDToken, address _tangibleLabs) external initializer {
-        require(_defaultUSDToken != address(0), "UZ");
+        require(_defaultUSDToken != address(0) && _tangibleLabs != address(0), "UZ");
         __Ownable_init(msg.sender);
 
         defUSD = IERC20(_defaultUSDToken);
@@ -356,8 +359,6 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
             // 8
             old = currencyFeed;
             currencyFeed = _contractAddress;
-        } else {
-            revert("Incorrect _contractId input");
         }
         emit ContractUpdated(uint256(_contractId), old, _contractAddress);
     }
@@ -423,12 +424,6 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         uint256 tokenId,
         uint256 _years
     ) external onlyMarketplace returns (uint256) {
-        (uint256 tokenPrice, , ) = priceManager.oracleForCategory(tnft).usdPrice(
-            tnft,
-            paymentToken,
-            0,
-            tokenId
-        );
 
         bool storagePriceFixed = tnft.adjustStorage(tokenId, _years);
         //amount to pay
@@ -440,6 +435,15 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
                 toDecimals(tnft.storagePricePerYear(), decimals, paymentToken.decimals()) *
                 _years;
         } else {
+            (uint256 tokenPrice, , ) = priceManager.oracleForCategory(tnft).usdPrice(
+                tnft,
+                paymentToken,
+                0,
+                tokenId
+            );
+            // here we use the same decimals value because storage decimals is the same
+            // ass percentage representation, and it will always be the case
+            // 100_decimals is 100%.
             require(tokenPrice > 0, "Price 0");
             amount =
                 (tokenPrice * tnft.storagePercentagePricePerYear() * _years) /
@@ -486,7 +490,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         if (marketplace != msg.sender) {
             require(voucher.vendor == msg.sender, "MFSE");
             mintCount = voucher.mintCount;
-        } else if (marketplace == msg.sender) {
+        } else {
             require(voucher.buyer != address(0), "BMNBZ");
             require(
                 voucher.vendor == categoryOwner[voucher.token] ||
@@ -519,7 +523,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
         // send minted tokens to marketplace. when price is 0 - use oracle
         uint256 tokenIdsLength = tokenIds.length;
-        for (uint256 i = 0; i < tokenIdsLength; i++) {
+        for (uint256 i = 0; i < tokenIdsLength;) {
             //decrease stock
             priceManager.oracleForCategory(voucher.token).decrementSellStock(voucher.fingerprint);
             // send NFT
@@ -536,6 +540,9 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
                     tokenIds[i],
                     voucher.buyer
                 );
+            }
+            unchecked {
+                ++i;
             }
         }
 
@@ -565,11 +572,17 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         uint256 _tnftType
     ) external onlyCategoryMinter returns (ITangibleNFT) {
         if (msg.sender != tangibleLabs) {
-            require(numCategoriesToMint[msg.sender][_tnftType] > 0, "Can't create more");
+            mapping(uint256 => uint256) storage _numCategoriesToMintSender = numCategoriesToMint[msg.sender];
+            require(_numCategoriesToMintSender[_tnftType] > 0, "Can't create more");
             // reducing approved tnft creations
-            numCategoriesToMint[msg.sender][_tnftType]--;
+            unchecked {
+                _numCategoriesToMintSender[_tnftType]--;
+            }
         }
-        require(address(category[name]) == address(0), "CE");
+        require(
+            address(category[name]) == address(0) && address(categorySymbol[symbol]) == address(0),
+            "CE"
+        );
         require(tnftDeployer != address(0), "Deployer zero");
         ITangibleNFT tangibleNFT = ITangibleNFTDeployer(tnftDeployer).deployTnft(
             name,
@@ -581,6 +594,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
             _tnftType
         );
         category[name] = tangibleNFT;
+        categorySymbol[symbol] = tangibleNFT;
         _tnfts.push(tangibleNFT);
         categoryOwner[tangibleNFT] = msg.sender;
 
@@ -599,12 +613,11 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
             tangibleNFT,
             IPriceOracle(priceOracle)
         );
-        // update what owner owns
+        // update what tangible labs owns
         if (msg.sender == tangibleLabs) {
             ownedByLabs.push(tangibleNFT);
+            fingerprintApprovalManager[tangibleNFT] = msg.sender;
         }
-
-        fingerprintApprovalManager[tangibleNFT] = msg.sender;
 
         emit NewCategoryDeployed(address(tangibleNFT), msg.sender);
         emit CategoryOwner(address(tangibleNFT), msg.sender);
@@ -699,19 +712,45 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         uint256[] memory tokenIds
     ) external onlyCategoryOwner(tnft) {
         uint256 length = tokenIds.length;
-        uint256 expiryDays = daysBeforeSeize[tnft] != 0
-            ? daysBeforeSeize[tnft]
-            : DEFAULT_SEIZE_DAYS;
-        for (uint256 i; i < length; ) {
-            uint256 token = tokenIds[i];
+        if (!_paysRent(tnft)) {
+            uint256 expiryDays = daysBeforeSeize[tnft] != 0
+                ? daysBeforeSeize[tnft]
+                : DEFAULT_SEIZE_DAYS;
+            for (uint256 i; i < length; ) {
+                uint256 token = tokenIds[i];
+                uint256 endTime = tnft.storageEndTime(token);
+                // if endTime is not 0, it means that the token has some storage paid already
+                if (endTime != 0) {
+                    // we have 2 cases here: one where storage was is required
+                    // we check anyway if already paid storage has expired
+                    require(endTime + expiryDays * 1 days < block.timestamp);
+                    // and another case where it was required at the begining, but now it isn't
+                    if (!tnft.storageRequired()) {
+                        require(tnft.blackListedTokens(token), "Not blacklisted");
+                    }
+                } else {
+                    // no storage is required, so we just check if it is blacklisted
+                    require(tnft.blackListedTokens(tokenIds[i]), "Not blacklisted");
+                }
 
-            require(tnft.storageEndTime(token) + expiryDays * 1 days < block.timestamp);
+                address ownerTnft = tnft.ownerOf(token);
+                tnft.safeTransferFrom(ownerTnft, categoryOwner[tnft], token);
 
-            address ownerTnft = tnft.ownerOf(token);
-            tnft.safeTransferFrom(ownerTnft, categoryOwner[tnft], token);
-
-            unchecked {
-                ++i;
+                unchecked {
+                    ++i;
+                }
+            }
+        } else {
+            //for tnfts that have paid rent, we seize them
+            //only if they are blacklisted
+            for (uint256 i; i < length; ) {
+                uint256 token = tokenIds[i];
+                require(tnft.blackListedTokens(token), "Not blacklisted");
+                address ownerTnft = tnft.ownerOf(token);
+                tnft.safeTransferFrom(ownerTnft, categoryOwner[tnft], token);
+                unchecked {
+                    ++i;
+                }
             }
         }
     }

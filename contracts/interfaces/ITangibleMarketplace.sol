@@ -39,7 +39,14 @@ interface ITangibleMarketplace is IVoucher {
 
     /// @dev The function allows the user to buy any TangibleNFT
     /// from the Marketplace for payment token that seller wants
-    function buy(ITangibleNFT nft, uint256 tokenId, uint256 _years) external;
+    function buy(
+        ITangibleNFT nft,
+        uint256 tokenId,
+        uint256 _years,
+        uint256 _maxStorageAmount,
+        address _paymentToken,
+        uint256 _paymentAmount
+    ) external;
 
     /// @dev The function allows the user to buy any TangibleNFT from the Marketplace
     /// for defaultUSD token if paymentToken is empty, only for unminted items
@@ -47,7 +54,8 @@ interface ITangibleMarketplace is IVoucher {
         ITangibleNFT nft,
         IERC20 paymentToken,
         uint256 _fingerprint,
-        uint256 _years
+        uint256 _years,
+        uint256 _maxStorageAmount
     ) external returns (uint256 tokenId);
 
     /// @dev The function returns the address of the fee storage.
@@ -58,7 +66,8 @@ interface ITangibleMarketplace is IVoucher {
         ITangibleNFT nft,
         IERC20Metadata paymentToken,
         uint256 tokenId,
-        uint256 _years
+        uint256 _years,
+        uint256 _maxStorageAmount
     ) external;
 
     function setDesignatedBuyer(

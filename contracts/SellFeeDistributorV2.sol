@@ -24,11 +24,11 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     /// @notice Stores The full portion of fees with 9 basis points.
     uint256 private constant FULL_PORTION = 100_000000000;
 
-    /// @notice Stores the address for USDC stablecoin.
-    IERC20 public USDC;
+    /// @notice Stores the address for REVENUE_TOKEN stablecoin.
+    IERC20 public REVENUE_TOKEN;
 
-    /// @notice Stores the address of the native TNGBL Erc20 token.
-    IERC20 public TNGBL;
+    /// @notice Stores the address of the native RWA_TOKEN Erc20 token.
+    IERC20 public RWA_TOKEN;
 
     /// @notice Stores the address where the revenue portion of fees are distributed.
     address public revenueShare;
@@ -44,7 +44,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     /// @notice This event is emitted when fees are distributed.
     event FeeDistributed(address indexed to, uint256 usdcAmount);
 
-    /// @notice This event is emitted when TNGBL tokens are burned.
+    /// @notice This event is emitted when RWA_TOKEN tokens are burned.
     event TangibleBurned(uint256 burnedTngbl);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -58,20 +58,21 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      * @notice Initializes SellFeeDistributor.
      * @param _factory Address of  Factory contract.
      * @param _revenueShare Address of RevenueShare.
-     * @param _usdc Address of USDC stablecoin.
-     * @param _tngbl Address of TNGBL token.
+     * @param _revenueToken Address of Revenue token .
+     * @param _rwaToken Address of RWA token.
      * @param _isMainnet If deploying to mainnet will be true.
      */
     function initialize(
         address _factory,
         address _revenueShare,
-        address _usdc,
-        address _tngbl,
+        address _revenueToken,
+        address _rwaToken,
         bool _isMainnet
     ) external initializer {
         __FactoryModifiers_init(_factory);
-        USDC = IERC20(_usdc);
-        TNGBL = IERC20(_tngbl);
+        require(_revenueShare != address(0) && _revenueToken != address(0) && _rwaToken != address(0), "ZA 0");
+        REVENUE_TOKEN = IERC20(_revenueToken);
+        RWA_TOKEN = IERC20(_rwaToken);
         revenueShare = _revenueShare;
         revenuePercent = 66_666666666;
         isMainnet = _isMainnet;
@@ -84,8 +85,26 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      * @param _revenueShare New revenueShare address.
      */
     function setRevenueShare(address _revenueShare) external onlyFactoryOwner {
-        require((_revenueShare != address(0)) && (_revenueShare != revenueShare), "Wrong revenue");
+        require(_revenueShare != address(0) && _revenueShare != revenueShare, "Wrong revenue");
         revenueShare = _revenueShare;
+    }
+
+    /**
+     * @notice This method is used for the Factory owner to update the `revenueToken` variable.
+     * @param _revenueToken New revenue token address.
+     */
+    function setRevenueToken(address _revenueToken) external onlyFactoryOwner {
+        require((_revenueToken != address(0)) && (_revenueToken != address(REVENUE_TOKEN)), "Wrong revenue token");
+        REVENUE_TOKEN = IERC20(_revenueToken);
+    }
+
+    /**
+     * @notice This method is used for the Factory owner to update the `rwaToken` variable.
+     * @param _rwaToken New rwa token address.
+     */
+    function setRWAToken(address _rwaToken) external onlyFactoryOwner {
+        require((_rwaToken != address(0)) && (_rwaToken != address(RWA_TOKEN)), "Wrong rwa token");
+        RWA_TOKEN = IERC20(_rwaToken);
     }
 
     /**
@@ -108,7 +127,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     }
 
     /**
-     * @notice This method is used for the Factory owner to withdraw USDC from the contract.
+     * @notice This method is used for the Factory owner to withdraw REVENUE_TOKEN from the contract.
      * @param _token Erc20 token to be witdrawn from this contract.
      */
     function withdrawToken(IERC20 _token) external onlyFactoryOwner {
@@ -128,24 +147,24 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      * @notice This method allocates an amount of tokens to the revenueShare contract and burns the rest.
      * @param _paymentToken Erc20 token to take as payment.
      * @param _feeAmount Amount of `_paymentToken` being used for payment.
-     * @dev This method will exchange a `revenuePercent` of `_feeAmount` for USDC and transfer that USDC
-     *      to the `revenueShare` contract. The rest will be exchanged for TNGBL tokens and burned.
+     * @dev This method will exchange a `revenuePercent` of `_feeAmount` for REVENUE_TOKEN and transfer that REVENUE_TOKEN
+     *      to the `revenueShare` contract. The rest will be exchanged for RWA_TOKEN tokens and burned.
      */
     function _distributeFee(IERC20 _paymentToken, uint256 _feeAmount) internal {
         //take 66.6666% and send to revenueShare
         uint256 amountForRevenue = (_feeAmount * revenuePercent) / FULL_PORTION;
         uint256 amountForBurn = _feeAmount - amountForRevenue;
-        if (address(_paymentToken) != address(USDC)) {
+        if (address(_paymentToken) != address(REVENUE_TOKEN)) {
             //we need to convert the payment token to usdc
             _paymentToken.approve(address(exchange), amountForRevenue);
             amountForRevenue = exchange.exchange(
                 address(_paymentToken),
-                address(USDC),
+                address(REVENUE_TOKEN),
                 amountForRevenue,
-                exchange.quoteOut(address(_paymentToken), address(USDC), amountForRevenue)
+                exchange.quoteOut(address(_paymentToken), address(REVENUE_TOKEN), amountForRevenue)
             );
         }
-        USDC.safeTransfer(revenueShare, amountForRevenue);
+        REVENUE_TOKEN.safeTransfer(revenueShare, amountForRevenue);
         emit FeeDistributed(revenueShare, amountForRevenue);
 
         //convert 33.334% to tngbl and burn it
@@ -153,16 +172,20 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
         _paymentToken.approve(address(exchange), amountForBurn);
         uint256 tngblToBurn = exchange.exchange(
             address(_paymentToken),
-            address(TNGBL),
+            address(RWA_TOKEN),
             amountForBurn,
-            exchange.quoteOut(address(_paymentToken), address(TNGBL), amountForBurn)
+            exchange.quoteOut(address(_paymentToken), address(RWA_TOKEN), amountForBurn)
         );
 
         if (isMainnet) {
             //burn the tngbl
-            TNGBL.approve(address(this), tngblToBurn);
-            ERC20Burnable(address(TNGBL)).burn(tngblToBurn);
+            RWA_TOKEN.approve(address(this), tngblToBurn);
+            ERC20Burnable(address(RWA_TOKEN)).burn(tngblToBurn);
 
+            emit TangibleBurned(tngblToBurn);
+        } else {
+            //send to dead address
+            RWA_TOKEN.safeTransfer(0xdeaDDeADDEaDdeaDdEAddEADDEAdDeadDEADDEaD, tngblToBurn);
             emit TangibleBurned(tngblToBurn);
         }
     }

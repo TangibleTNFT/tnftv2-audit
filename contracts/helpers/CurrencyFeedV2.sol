@@ -88,6 +88,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
         AggregatorV3Interface _priceFeed
     ) external onlyFactoryOwner {
         currencyPriceFeeds[_currency] = _priceFeed;
+        require(ISOcurrencyCodeToNum[_currency] != 0, "Currency not set");
         // set for iso
         currencyPriceFeedsISONum[ISOcurrencyCodeToNum[_currency]] = _priceFeed;
     }
@@ -102,6 +103,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
         uint256 _conversionPremium
     ) external onlyFactoryOwner {
         conversionPremiums[_currency] = _conversionPremium;
+        require(ISOcurrencyCodeToNum[_currency] != 0, "Curency code 0");
         // set for iso
         conversionPremiumsISONum[ISOcurrencyCodeToNum[_currency]] = _conversionPremium;
     }

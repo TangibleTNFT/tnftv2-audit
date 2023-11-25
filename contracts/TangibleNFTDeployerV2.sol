@@ -67,6 +67,7 @@ contract TangibleNFTDeployerV2 is ITangibleNFTDeployer, FactoryModifiers {
                 _tnftType
             )
         );
+        require(tnftBeaconProxy[symbol] == address(0), "TNFT already exists");
         // store beacon proxy address in mapping
         tnftBeaconProxy[symbol] = address(newTangibleNFTV2Beacon);
 

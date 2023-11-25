@@ -31,8 +31,14 @@ contract TNFTMarketplaceV2 is
 
     // ~ State Variables ~
 
+    struct BuyHelper {
+        address buyer;
+        uint256 cost;
+        uint256 toPaySeller;
+    }
+
     /// @notice This constant stores the default sell fee of 2.5% (2 basis points).
-    uint256 public constant DEFAULT_SELL_FEE = 250;
+    uint256 public constant DEFAULT_SELL_FEE = 2_50;
 
     /// @notice This mapping is used to store Lot data for each token listed on the marketplace.
     mapping(address => mapping(uint256 => Lot)) public marketplaceLot;
@@ -233,7 +239,7 @@ contract TNFTMarketplaceV2 is
         address ownerOfNft = nft.ownerOf(tokenId);
         //if marketplace is owner and seller wants to update price
         Lot storage lot = marketplaceLot[address(nft)][tokenId];
-        if ((address(this) == ownerOfNft) && (msg.sender == lot.seller)) {
+        if (address(this) == ownerOfNft && msg.sender == lot.seller) {
             lot.price = price;
             lot.paymentToken = paymentToken;
         } else {
@@ -299,11 +305,12 @@ contract TNFTMarketplaceV2 is
     function _stopSale(ITangibleNFT nft, uint256 tokenId) internal {
         address seller = msg.sender;
         // gas saving
-        Lot memory _lot = marketplaceLot[address(nft)][tokenId];
+        mapping(uint256 => Lot) storage marketplaceLotForNft = marketplaceLot[address(nft)];
+        Lot memory _lot = marketplaceLotForNft[tokenId];
         require(_lot.seller == seller, "NOS");
 
         emit StopSelling(seller, address(nft), tokenId);
-        delete marketplaceLot[address(nft)][tokenId];
+        delete marketplaceLotForNft[tokenId];
         //update tracker
         _updateTrackerTnft(nft, tokenId, false);
 
@@ -315,17 +322,22 @@ contract TNFTMarketplaceV2 is
      * @param nft TangibleNFT contract reference.
      * @param tokenId TNFT identifier.
      * @param _years Num of years to pay for storage.
+     * @param _maxStorageAmount Max amount to pay for storage.
+     * @param _paymentToken Erc20 token being used as payment ,sent as param to protect payer.
+     * @param _paymentAmount Price of in Lot, to protect the payer.
      */
-    function buy(ITangibleNFT nft, uint256 tokenId, uint256 _years) external nonReentrant {
+    function buy(
+        ITangibleNFT nft,
+        uint256 tokenId,
+        uint256 _years,
+        uint256 _maxStorageAmount,
+        address _paymentToken,
+        uint256 _paymentAmount
+    ) external nonReentrant {
         //pay for storage
         if ((!nft.isStorageFeePaid(tokenId) || _years > 0) && nft.storageRequired()) {
             require(_years > 0, "YZ");
-            _payStorage(
-                nft,
-                IERC20Metadata(address(marketplaceLot[address(nft)][tokenId].paymentToken)),
-                tokenId,
-                _years
-            );
+            _payStorage(nft, IERC20Metadata(_paymentToken), tokenId, _years, _maxStorageAmount);
         }
         // if initial sale is not done, and whitelitsing is required, check if buyer is whitelisted
         if (
@@ -335,7 +347,7 @@ contract TNFTMarketplaceV2 is
             require(IFactory(factory()).whitelistForBuyUnminted(nft, msg.sender), "NW");
         }
         //buy the token
-        _buy(nft, tokenId, true);
+        _buy(nft, tokenId, true, _paymentToken, _paymentAmount);
     }
 
     /**
@@ -344,14 +356,16 @@ contract TNFTMarketplaceV2 is
      * @param paymentToken Erc20 token being used to pay for storage.
      * @param tokenId TNFT identifier.
      * @param _years Num of years to pay for storage.
+     * @param _maxStorageAmount Max amount to pay for storage.
      */
     function payStorage(
         ITangibleNFT nft,
         IERC20Metadata paymentToken,
         uint256 tokenId,
-        uint256 _years
+        uint256 _years,
+        uint256 _maxStorageAmount
     ) external {
-        _payStorage(nft, paymentToken, tokenId, _years);
+        _payStorage(nft, paymentToken, tokenId, _years, _maxStorageAmount);
     }
 
     /**
@@ -365,21 +379,27 @@ contract TNFTMarketplaceV2 is
         ITangibleNFT nft,
         IERC20Metadata paymentToken,
         uint256 tokenId,
-        uint256 _years
+        uint256 _years,
+        uint256 _maxAmount
     ) internal {
         require(nft.storageRequired(), "STNR");
         require(_years > 0, "YZ");
+        IFactory _factory = IFactory(factory());
 
-        uint256 amount = IFactory(factory()).adjustStorageAndGetAmount(
+        uint256 amount = _factory.adjustStorageAndGetAmount(
             nft,
             paymentToken,
             tokenId,
             _years
         );
+        // make sure not to overpay
+        if (_maxAmount != 0) {
+            require(amount <= _maxAmount, "MAMT");
+        }
         //we take in default USD token
         IERC20(address(paymentToken)).safeTransferFrom(
             msg.sender,
-            IFactory(factory()).categoryOwnerWallet(nft),
+            _factory.categoryOwnerWallet(nft),
             amount
         );
         emit StorageFeePaid(address(nft), tokenId, address(paymentToken), msg.sender, amount);
@@ -391,12 +411,14 @@ contract TNFTMarketplaceV2 is
      * @param paymentToken Erc20 token being used as payment.
      * @param _fingerprint Fingerprint of token.
      * @param _years Num of years to store item in advance.
+     * @param _maxStorageAmount Max amount to pay for storage.
      */
     function buyUnminted(
         ITangibleNFT nft,
         IERC20 paymentToken,
         uint256 _fingerprint,
-        uint256 _years
+        uint256 _years,
+        uint256 _maxStorageAmount
     ) external nonReentrant returns (uint256 tokenId) {
         address _factory = factory();
         if (IFactory(_factory).onlyWhitelistedForUnmintedCategory(nft)) {
@@ -431,12 +453,24 @@ contract TNFTMarketplaceV2 is
         tokenId = tokenIds[0];
         //pay for storage
         if (nft.storageRequired() && !nft.isStorageFeePaid(tokenId)) {
-            _payStorage(nft, IERC20Metadata(address(paymentToken)), tokenId, _years);
+            _payStorage(
+                nft,
+                IERC20Metadata(address(paymentToken)),
+                tokenId,
+                _years,
+                _maxStorageAmount
+            );
         }
 
         marketplaceLot[address(nft)][tokenId].paymentToken = paymentToken;
         //pricing should be handled from oracle
-        _buy(voucher.token, tokenIds[0], false);
+        _buy(
+            voucher.token,
+            tokenIds[0],
+            false,
+            address(paymentToken),
+            tokenPrice + tokenizationCost
+        );
     }
 
     /**
@@ -477,43 +511,51 @@ contract TNFTMarketplaceV2 is
      * @param tokenId TNFT identifier to buy.
      * @param chargeFee If true, a fee will be charged from buyer.
      */
-    function _buy(ITangibleNFT nft, uint256 tokenId, bool chargeFee) internal {
+    function _buy(
+        ITangibleNFT nft,
+        uint256 tokenId,
+        bool chargeFee,
+        address _paymentToken,
+        uint256 _price
+    ) internal {
         // gas saving
-        address buyer = msg.sender;
+        BuyHelper memory helper = BuyHelper(msg.sender, 0, 0);
 
         Lot memory _lot = marketplaceLot[address(nft)][tokenId];
         require(_lot.seller != address(0), "NLO");
         // if there is a buyer set, only that buyer can buy
         if (_lot.designatedBuyer != address(0)) {
-            require(_lot.designatedBuyer == buyer, "NDB");
+            require(_lot.designatedBuyer == helper.buyer, "NDB");
         }
         IERC20 pToken = _lot.paymentToken;
 
         // if lot.price == 0 it means vendor minted it, we must take price from oracle
         // if lot.price != 0 means some seller posted it and didn't want to use oracle
-        uint256 cost = _lot.price;
+        helper.cost = _lot.price;
+        //protection from over charging
+        require(helper.cost <= _price && address(pToken) == _paymentToken, "OC");
         uint256 tokenizationCost;
-        if (cost == 0) {
-            (cost, , tokenizationCost) = _itemPrice(
+        if (helper.cost == 0) {
+            (helper.cost, , tokenizationCost) = _itemPrice(
                 nft,
                 IERC20Metadata(address(pToken)),
                 tokenId,
                 false
             );
-            cost += tokenizationCost;
+            helper.cost += tokenizationCost;
             tokenizationCost = 0;
         }
 
-        require(cost != 0, "Price0");
+        require(helper.cost != 0, "Price0");
 
         //take the fee
-        uint256 toPaySeller = cost;
+        helper.toPaySeller = helper.cost;
         uint256 _sellFee = feesPerCategory[nft] == 0 ? DEFAULT_SELL_FEE : feesPerCategory[nft];
         if ((_sellFee > 0) && chargeFee) {
             // if there is fee set, decrease amount by the fee and send fee
-            uint256 fee = ((toPaySeller * _sellFee) / 10000);
-            toPaySeller = toPaySeller - fee;
-            pToken.safeTransferFrom(buyer, sellFeeAddress, fee);
+            uint256 fee = ((helper.toPaySeller * _sellFee) / 10000);
+            helper.toPaySeller = helper.toPaySeller - fee;
+            pToken.safeTransferFrom(helper.buyer, sellFeeAddress, fee);
             ISellFeeDistributor(sellFeeAddress).distributeFee(pToken, fee);
             emit MarketplaceFeePaid(address(nft), tokenId, address(pToken), fee);
         }
@@ -528,19 +570,19 @@ contract TNFTMarketplaceV2 is
             }
         }
 
-        pToken.safeTransferFrom(buyer, _lot.seller, toPaySeller);
+        pToken.safeTransferFrom(helper.buyer, _lot.seller, helper.toPaySeller);
 
-        emit TnftSold(address(nft), tokenId, address(pToken), _lot.seller, cost);
-        emit TnftBought(address(nft), tokenId, address(pToken), buyer, cost);
+        emit TnftSold(address(nft), tokenId, address(pToken), _lot.seller, helper.cost);
+        emit TnftBought(address(nft), tokenId, address(pToken), helper.buyer, helper.cost);
         delete marketplaceLot[address(nft)][tokenId];
         //update tracker
         _updateTrackerTnft(nft, tokenId, false);
 
-        if (initialSaleCompleted[nft][tokenId] == false) {
+        if (!initialSaleCompleted[nft][tokenId]) {
             initialSaleCompleted[nft][tokenId] = true;
         }
 
-        nft.safeTransferFrom(address(this), buyer, tokenId);
+        nft.safeTransferFrom(address(this), helper.buyer, tokenId);
     }
 
     /**
@@ -603,18 +645,16 @@ contract TNFTMarketplaceV2 is
         address nft = msg.sender;
         uint256 price = abi.decode(data, (uint256));
         IERC20 defUSD = IFactory(factory()).defUSD();
-        require(
-            address(IFactory(factory()).category(ITangibleNFT(nft).name())) != address(0),
-            "Not TNFT"
-        );
+        require(address(IFactory(factory()).category(ITangibleNFT(nft).name())) == nft, "Not TNFT");
 
-        marketplaceLot[nft][tokenId] = Lot(
-            ITangibleNFT(nft),
-            defUSD,
-            tokenId,
-            seller,
-            price,
-            address(0)
+        marketplaceLot[nft][tokenId] = Lot({
+            nft:ITangibleNFT(nft),
+            paymentToken:defUSD,
+            tokenId:tokenId,
+            seller:seller,
+            price:price,
+            designatedBuyer:address(0)
+        }
         );
         _updateTrackerTnft(ITangibleNFT(nft), tokenId, true);
 

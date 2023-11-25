@@ -31,6 +31,26 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     /// @notice Holds the address of the notification dispatcher.
     IRWAPriceNotificationDispatcher public notificationDispatcher;
 
+    // ~ Events ~
+
+    /**
+     *
+     * @param currencyFeed Address of currency feed contract.
+     */
+    event CurrencyFeedUpdated(address indexed currencyFeed);
+
+    /**
+     *
+     * @param chainlinkRWAOracle Address of chainlink RWA oracle contract.
+     */
+    event ChainlinkOracleUpdated(address indexed chainlinkRWAOracle);
+
+    /**
+     *
+     * @param notificationDispatcher Address of notification dispatcher contract.
+     */
+    event NotificationDispatcherUpdated(address indexed notificationDispatcher);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -134,7 +154,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
             uint256[] memory tokenizationCost
         )
     {
-        bool useFingerprint = _fingerprints.length == 0 ? false : true;
+        bool useFingerprint = !(_fingerprints.length == 0);
         uint256 length = useFingerprint ? _fingerprints.length : _tokenIds.length;
         weSellAt = new uint256[](length);
         weSellAtStock = new uint256[](length);
@@ -210,7 +230,9 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
      * @param _currencyFeed New address to store in `currencyFeed`.
      */
     function setCurrencyFeed(address _currencyFeed) external onlyTangibleLabs {
+        require(_currencyFeed != address(0), "CF 0");
         currencyFeed = ICurrencyFeedV2(_currencyFeed);
+        emit CurrencyFeedUpdated(_currencyFeed);
     }
 
     /**
@@ -218,7 +240,9 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
      * @param _chainlinkRWAOracle New address to store in `chainlinkRWAOracle`.
      */
     function setChainlinkOracle(address _chainlinkRWAOracle) external onlyTangibleLabs {
+        require(_chainlinkRWAOracle != address(0), "CO 0");
         chainlinkRWAOracle = IChainlinkRWAOracle(_chainlinkRWAOracle);
+        emit ChainlinkOracleUpdated(_chainlinkRWAOracle);
     }
 
     /**
@@ -226,7 +250,9 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
      * @param _notificationDispatcher New address to store in `notificationDispatcher`.
      */
     function setNotificationDispatcher(address _notificationDispatcher) external onlyTangibleLabs {
+        require(_notificationDispatcher != address(0), "ND 0");
         notificationDispatcher = IRWAPriceNotificationDispatcher(_notificationDispatcher);
+        emit NotificationDispatcherUpdated(_notificationDispatcher);
     }
 
     function notify(
@@ -277,10 +303,13 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     ) external view returns (uint256 nativePrice, uint256 currency) {
         uint256 length = fingerprints.length;
         require(length > 0, "no input");
-        currency = chainlinkRWAOracle.fingerprintData(fingerprints[0]).currency;
-
-        for (uint256 i; i < length; ) {
-            IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(
+        IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(
+            fingerprints[0]
+        );
+        currency = data.currency;
+        nativePrice += data.weSellAt + data.lockedAmount;
+        for (uint256 i = 1; i < length; ) {
+            data = chainlinkRWAOracle.fingerprintData(
                 fingerprints[i]
             );
             require(currency == data.currency, "not same currency");

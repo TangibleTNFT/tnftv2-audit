@@ -16,13 +16,13 @@ contract TangibleReaderHelperV2 {
     // ~ State Variables ~
 
     /// @notice Stores a reference to the Factory contract.
-    IFactory public factory;
+    IFactory public immutable factory;
 
     /// @notice Stores a reference to the passiveNFT contract.
-    IPassiveIncomeNFT public passiveNft;
+    IPassiveIncomeNFT public immutable passiveNft;
 
     /// @notice Stores a reference to the revenueShare contract.
-    RevenueShare public revenueShare;
+    RevenueShare public immutable revenueShare;
 
     // ~ Constructor ~
 
@@ -33,7 +33,12 @@ contract TangibleReaderHelperV2 {
      * @param _revenueShare RevenueShare contract reference.
      */
     constructor(IFactory _factory, IPassiveIncomeNFT _passiveNft, RevenueShare _revenueShare) {
-        require(address(_factory) != address(0), "FP 0");
+        require(
+            address(_factory) != address(0) &&
+                address(_passiveNft) != address(0) &&
+                address(_revenueShare) != address(0),
+            "ZA 0"
+        );
         factory = _factory;
         passiveNft = _passiveNft;
         revenueShare = _revenueShare;

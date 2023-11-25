@@ -193,7 +193,7 @@ contract TangibleNFTV2 is
         _baseUriLink = _uri;
 
         storagePriceFixed = _storagePriceFixed;
-        storagePricePerYear = 2000; // 20$ in 2 decimals
+        storagePricePerYear = 20_00; // 20$ in 2 decimals
         storagePercentagePricePerYear = 10; // 0.1 percent
         storageRequired = _storageRequired;
         symbolInUri = _symbolInUri;
@@ -201,7 +201,6 @@ contract TangibleNFTV2 is
         deploymentBlock = block.number;
         tnftType = _tnftType;
         storageDecimals = 2;
-        lastTokenId = 0;
     }
 
     // ~ External Functions ~
@@ -299,6 +298,12 @@ contract TangibleNFTV2 is
         uint8 decimals
     ) external onlyCategoryOwner(ITangibleNFT(address(this))) {
         require(decimals >= 0 && decimals <= 18, "wrong");
+        // storagePricePerYear is directly related to storageDecimals
+        if (storageDecimals < decimals){
+            storagePricePerYear = storagePricePerYear * (10 ** (decimals - storageDecimals));
+        } else if (storageDecimals > decimals) {
+            storagePricePerYear = storagePricePerYear / (10 ** (storageDecimals - decimals));
+        }
         storageDecimals = decimals;
     }
 
@@ -378,6 +383,12 @@ contract TangibleNFTV2 is
         }
     }
 
+    /**
+     *
+     * @notice This function attaches metadata to a token.
+     * @param tokenId TNFT tokenId
+     * @param _features List of features to be added to the token.
+     */
     function addMetadata(
         uint256 tokenId,
         uint256[] calldata _features
@@ -389,13 +400,15 @@ contract TangibleNFTV2 is
         for (uint256 i; i < length; ) {
             uint256 feature = _features[i];
             require(tnftMetadata.featureInType(tnftType, feature), "feature not in tfntType");
-            require(!tokenFeatureAdded[tokenId][feature].added, "already added");
+            FeatureInfo storage featureInfo = tokenFeatureAdded[tokenId][feature];
+            uint256[] storage features = tokenFeatures[tokenId];
+            require(!featureInfo.added, "already added");
             // add to array
-            tokenFeatures[tokenId].push(feature);
+            features.push(feature);
             // add in map
-            tokenFeatureAdded[tokenId][feature].added = true;
-            tokenFeatureAdded[tokenId][feature].feature = feature;
-            tokenFeatureAdded[tokenId][feature].index = tokenFeatures[tokenId].length - 1;
+            featureInfo.added = true;
+            featureInfo.feature = feature;
+            featureInfo.index = features.length - 1;
             emit TnftFeature(tokenId, feature, true);
 
             unchecked {
@@ -404,25 +417,34 @@ contract TangibleNFTV2 is
         }
     }
 
+    /**
+     * @notice This function removes metadata from a token.
+     * @param tokenId TNFT tokenId
+     * @param _features List of features to be removed from the token.
+     */
     function removeMetadata(
         uint256 tokenId,
         uint256[] calldata _features
     ) external onlyCategoryOwner(ITangibleNFT(address(this))) {
-        ITNFTMetadata tnftMetadata = ITNFTMetadata(IFactory(factory()).tnftMetadata());
         uint256 length = _features.length;
 
         for (uint256 i; i < length; ) {
             uint256 feature = _features[i];
-            require(tnftMetadata.featureInType(tnftType, feature), "feature not in tfntType");
-            require(tokenFeatureAdded[tokenId][feature].added, "!exist");
-            // take last element
-            uint256 last = tokenFeatures[tokenId][tokenFeatures[tokenId].length - 1];
-            // set it to index
-            tokenFeatures[tokenId][tokenFeatureAdded[tokenId][feature].index] = last;
+            uint256[] storage features = tokenFeatures[tokenId];
+            mapping(uint256 => FeatureInfo) storage featureInfo = tokenFeatureAdded[tokenId];
+            require(featureInfo[feature].added, "!exist");
+            // if element is the last one, just pop it
+            if(features.length != 1) {
+                // take last element
+                uint256 last = features[features.length - 1];
+                // set it to index
+                features[featureInfo[feature].index] = last;
+                // update index of the last
+                featureInfo[last].index = featureInfo[feature].index;
+            }
             //remove from array
-            tokenFeatures[tokenId].pop();
-            // delete mapping and update index of the last
-            tokenFeatureAdded[tokenId][last].index = tokenFeatureAdded[tokenId][feature].index;
+            features.pop();
+            // delete mapping and
             delete tokenFeatureAdded[tokenId][feature];
             emit TnftFeature(tokenId, feature, false);
 
@@ -560,6 +582,13 @@ contract TangibleNFTV2 is
         return super.supportsInterface(interfaceId);
     }
 
+    /**
+     * @dev This external function is used to return the boolean value of whether storage has to be paid for token.
+     */
+    function shouldPayStorage() external view returns (bool) {
+        return _shouldPayStorage();
+    }
+
     // ~ Internal functions ~
 
     /**
@@ -628,7 +657,7 @@ contract TangibleNFTV2 is
         address _factory = factory();
         if (
             IFactory(_factory).categoryOwner(ITangibleNFT(address(this))) == from ||
-            (_factory == from) ||
+            _factory == from ||
             from == address(0) ||
             to == address(0)
         ) {
@@ -671,15 +700,7 @@ contract TangibleNFTV2 is
     }
 
     function _shouldPayStorage() internal view returns (bool) {
-        if (storageRequired) {
-            if (
-                (storagePriceFixed && storagePricePerYear == 0) ||
-                (!storagePriceFixed && storagePercentagePricePerYear == 0)
-            ) {
-                return false;
-            }
-            return true;
-        }
-        return false;
+        return storageRequired && ((storagePriceFixed && storagePricePerYear != 0) || (!storagePriceFixed && storagePercentagePricePerYear != 0));
+
     }
 }

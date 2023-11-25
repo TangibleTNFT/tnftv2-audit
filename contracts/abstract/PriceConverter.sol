@@ -10,10 +10,12 @@ abstract contract PriceConverter {
         uint8 toDecimal
     ) internal pure returns (uint256) {
         require(toDecimal >= uint8(0) && toDecimal <= uint8(18), "Invalid _decimals");
-        if (fromDecimal > toDecimal) {
-            amount = amount / (10 ** (fromDecimal - toDecimal));
-        } else if (fromDecimal < toDecimal) {
-            amount = amount * (10 ** (toDecimal - fromDecimal));
+        unchecked {
+            if (fromDecimal > toDecimal) {
+                amount = amount / (10 ** (fromDecimal - toDecimal));
+            } else if (fromDecimal < toDecimal) {
+                amount = amount * (10 ** (toDecimal - fromDecimal));
+            }
         }
         return amount;
     }

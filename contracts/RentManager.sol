@@ -114,13 +114,10 @@ contract RentManager is IRentManager, FactoryModifiers {
 
     /**
      * @notice Enum object to identify a custom contract data type via an enumerable.
-     * @param MARKETPLACE Marketplace contract (0)
-     * @param TNFT_DEPLOYER TangibleNFTDeployer contract (1)
-     * @param RENT_MANAGER_DEPLOYER Rent Manager deployer contract (2)
-     * @param LABS Tangible multisig address (3)
-     * @param PRICE_MANAGER Price Manager contract (4)
-     * @param TNFT_META TangibleNFTMetadata contract (5)
-     * @param REVENUE_SHARE TangibleRevenueShare contract (6)
+     * @param DAYS_31 Month has 31 days (0)
+     * @param DAYS_30 Month has 30 days (1)
+     * @param DAYS_28 Month has 28 days (2)
+     * @param DAYS_29 Month has 29 days (3)
      */
     enum DEPOSIT_MONTH {
         DAYS_31,
@@ -296,6 +293,7 @@ contract RentManager is IRentManager, FactoryModifiers {
         rent.depositAmount = 0;
         rent.distributionRunning = false;
         rent.endTime = 0;
+        rent.depositTime = 0;
         rent.rentToken = address(0);
     }
 
@@ -334,6 +332,24 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
+     * @notice Returns the rent info array for a given tokenIds.
+     * @param tokenIds The IDs of the tokens.
+     */
+    function claimableRentInfoBatch(
+        uint256[] calldata tokenIds
+    ) external view returns (RentInfo[] memory rentInfos, uint256[] memory claimables) {
+        uint256 length = tokenIds.length;
+        rentInfos = new RentInfo[](length);
+        claimables = new uint256[](length);
+        for (uint256 i; i < length; ) {
+            (claimables[i], rentInfos[i]) = _claimableRentInfoForToken(tokenIds[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /**
      * @dev Returns the total amount of rent that can be claimed for a given token.
      *
      * The function calculates the total claimable rent based on the rent info of the token.
@@ -360,6 +376,14 @@ contract RentManager is IRentManager, FactoryModifiers {
             return 0;
         }
         return rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
+    }
+
+    function _claimableRentInfoForToken(uint256 tokenId) internal view returns (uint256 claimable, RentInfo memory rInfo) {
+        RentInfo storage rent = rentInfo[tokenId];
+        if (rInfo.distributionRunning) {
+            claimable = rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
+            rInfo = rent;
+        }
     }
 
     /**
@@ -410,15 +434,13 @@ contract RentManager is IRentManager, FactoryModifiers {
         claimableRent = _claimableRentForToken(tokenId);
         require(claimableRent != 0, "No rent to claim");
 
-        RentInfo storage rent;
-
-        rent = rentInfo[tokenId];
+        RentInfo storage rent = rentInfo[tokenId];
 
         if (rent.unclaimedAmount > 0) {
             if (rent.unclaimedAmount < claimableRent) {
                 unchecked {
                     rent.claimedAmount += claimableRent - rent.unclaimedAmount;
-                    rent.claimedAmountTotal += claimableRent - rent.unclaimedAmount;
+                    rent.claimedAmountTotal += claimableRent;
                     rent.unclaimedAmount = 0;
                 }
             } else {
@@ -487,7 +509,7 @@ contract RentManager is IRentManager, FactoryModifiers {
         } else if (month == DEPOSIT_MONTH.DAYS_29) {
             return 29 days;
         } else {
-            revert("Incorrect month");
+            return 30 days;
         }
     }
 }

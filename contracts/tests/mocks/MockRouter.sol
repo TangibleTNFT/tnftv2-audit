@@ -10,44 +10,51 @@ interface ERC20Mintable {
     function burn(uint256 _amount) external;
 }
 
-interface IRouter {
-    struct Route {
-        address from;
-        address to;
-        bool stable;
-    }
+interface ISwapRouter {
+  struct ExactInputSingleParams {
+    address tokenIn;
+    address tokenOut;
+    uint24 fee;
+    address recipient;
+    uint256 deadline;
+    uint256 amountIn;
+    uint256 amountOutMinimum;
+    uint160 sqrtPriceLimitX96;
+  }
 
-    function getAmountOut(
-        uint256 amountIn,
-        address tokenIn,
-        address tokenOut
-    ) external view returns (uint256 amount, bool stable);
+  function exactInputSingle(
+    ExactInputSingleParams calldata params
+  ) external payable returns (uint256 amountOut);
 
-    function getAmountsOut(
-        uint256 amountIn,
-        Route[] calldata routes
-    ) external view returns (uint256[] memory amounts);
-
-    function swapExactTokensForTokensSimple(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address tokenFrom,
-        address tokenTo,
-        bool stable,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
-
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        Route[] calldata routes,
-        address to,
-        uint256 deadline
-    ) external returns (uint256[] memory amounts);
 }
 
-contract MockRouter is IRouter {
+interface ITNGBLV3Oracle {
+
+    function consultWithFee(
+        address tokenIn,
+        uint128 amountIn,
+        address tokenOut,
+        uint32 secondsAgo,
+        uint24 fee
+    ) external view returns (uint256);
+
+    function POOL_FEE_001() external view returns (uint24);
+    function POOL_FEE_005() external view returns (uint24);
+    function POOL_FEE_03() external view returns (uint24);
+    function POOL_FEE_1() external view returns (uint24);
+}
+
+contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
+    // 0.3% pool fee
+    uint24 public constant POOL_FEE_03 = 3000;
+    // 0.01% pool fee
+    uint24 public constant POOL_FEE_001 = 100;
+    // 1% pool fee
+    uint24 public constant POOL_FEE_1 = 10000;
+    // 0.05% pool fee
+    uint24 public constant POOL_FEE_005 = 500;
+    // Default seconds ago for the oracle
+    uint32 public constant DEFAULT_SECONDS_AGO = 300;
     function toDecimals(
         uint256 amount,
         uint8 fromDecimal,
@@ -62,85 +69,30 @@ contract MockRouter is IRouter {
         return amount;
     }
 
-    function getAmountOut(
-        uint256 amountIn,
+    function consultWithFee(
         address tokenIn,
-        address tokenOut
-    ) external view override returns (uint256 amount, bool stable) {
+        uint128 amountIn,
+        address tokenOut,
+        uint32, //secondsAgo,
+        uint24 //fee
+    ) external view returns (uint256 amountOut) {
         // Mock implementation, return amountIn in tokenOut decimals
         uint8 tokenOutDecimals = IERC20Metadata(tokenOut).decimals();
         uint8 tokenInDecimals = IERC20Metadata(tokenIn).decimals();
-        return (toDecimals(amountIn, tokenInDecimals, tokenOutDecimals), true);
+        return toDecimals(amountIn, tokenInDecimals, tokenOutDecimals);
     }
 
-    function getAmountsOut(
-        uint256 amountIn,
-        Route[] calldata routes
-    ) external view override returns (uint256[] memory amounts) {
-        // Mock implementation, return any values you need for testing
-        uint256 length = routes.length;
-        uint256[] memory result = new uint256[](length);
-        for (uint256 i = 0; i < length; ) {
-            result[i] = amountIn;
-            unchecked {
-                ++i;
-            }
-        }
-        uint8 tokenOutDecimals = IERC20Metadata(routes[0].from).decimals();
-        uint8 tokenInDecimals = IERC20Metadata(routes[length - 1].to).decimals();
-        result[length - 1] = toDecimals(amountIn, tokenInDecimals, tokenOutDecimals);
-        return result;
-    }
-
-    function swapExactTokensForTokensSimple(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address tokenFrom,
-        address tokenTo,
-        bool stable,
-        address to,
-        uint256 deadline
-    ) external override returns (uint256[] memory amounts) {
-        require(deadline <= block.timestamp, "expired");
+    function exactInputSingle(
+        ExactInputSingleParams calldata params
+    ) external payable returns (uint256 amountOut) {
         // Mock implementation, mint tokenOut and transfer it to 'to' address
-        uint8 tokenInDecimals = IERC20Metadata(tokenFrom).decimals();
-        uint8 tokenOutDecimals = IERC20Metadata(tokenTo).decimals();
-        uint256 amountOut = toDecimals(amountIn, tokenInDecimals, tokenOutDecimals);
+        uint8 tokenInDecimals = IERC20Metadata(params.tokenIn).decimals();
+        uint8 tokenOutDecimals = IERC20Metadata(params.tokenOut).decimals();
+        amountOut = toDecimals(params.amountIn, tokenInDecimals, tokenOutDecimals);
 
-        IERC20(tokenFrom).transferFrom(msg.sender, address(this), amountIn);
-        ERC20Mintable(tokenFrom).burn(amountIn);
-        ERC20Mintable(tokenTo).mint(to, amountOut);
-
-        uint256[] memory result = new uint256[](2);
-        result[0] = amountIn;
-        result[1] = amountOut;
-        require(amountOut == amountOutMin, "min not satisfied");
-        return result;
+        IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
+        ERC20Mintable(params.tokenIn).burn(params.amountIn);
+        ERC20Mintable(params.tokenOut).mint(params.recipient, amountOut);
     }
 
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        Route[] calldata routes,
-        address to,
-        uint256 deadline
-    ) external override returns (uint256[] memory amounts) {
-        // Mock implementation, mint tokenOut and transfer it to 'to' address
-        require(deadline <= block.timestamp, "expired");
-        uint256 length = routes.length;
-        uint8 tokenInDecimals = IERC20Metadata(routes[0].from).decimals();
-        uint8 tokenOutDecimals = IERC20Metadata(routes[length - 1].to).decimals();
-        uint256 amountOut = toDecimals(amountIn, tokenInDecimals, tokenOutDecimals);
-        IERC20(routes[0].from).transferFrom(msg.sender, address(this), amountIn);
-        ERC20Mintable(routes[0].from).burn(amountIn);
-        ERC20Mintable(routes[length - 1].to).mint(to, amountOut);
-
-        uint256[] memory result = new uint256[](routes.length);
-        for (uint256 i = 0; i < routes.length; i++) {
-            result[i] = amountIn;
-        }
-        require(amountOut == amountOutMin, "min not satisfied");
-        result[length - 1] = amountOut;
-        return result;
-    }
 }

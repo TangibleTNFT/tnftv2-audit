@@ -50,10 +50,11 @@ contract RentManagerDeployer is IRentManagerDeployer, FactoryModifiers {
      */
     function deployRentManager(address tnft) external returns (IRentManager) {
         require(msg.sender == factory(), "NF");
+        require(rentManagersBeaconProxy[tnft] == address(0), "RMNGE");
         // create new basket beacon proxy
         BeaconProxy newRentManagerBeacon = new BeaconProxy(
             address(beacon),
-            abi.encodeWithSelector(RentManager(address(0)).initialize.selector, tnft, factory())
+            abi.encodeWithSelector(RentManager.initialize.selector, tnft, factory())
         );
         // store beacon proxy address in mapping
         rentManagersBeaconProxy[tnft] = address(newRentManagerBeacon);

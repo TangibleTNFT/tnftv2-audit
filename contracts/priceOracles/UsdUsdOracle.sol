@@ -112,13 +112,9 @@ interface AggregatorV2V3Interface is AggregatorInterface, AggregatorV3Interface 
  */
 contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     /**
-     * @notice Reads the current answer from aggregator delegated to.
-     * @dev overridden function to add the checkAccess() modifier
-     *
-     * @dev #[deprecated] Use latestRoundData instead. This does not error if no
-     * answer has been reached, it will simply return 0. Either wait to point to
-     * an already answered Aggregator or use the recommended latestRoundData
-     * instead which includes better verification information.
+     * We simply return 1 for the latest answer, to support
+     * our flow in oracles when we do conversions from some other 
+     * currencies to USD. In case the currency is indeed USD, we just multiply with 1.
      */
     function latestAnswer() public view override returns (int256) {
         return 1;

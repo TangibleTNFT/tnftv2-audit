@@ -66,7 +66,7 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
      * @param place If true, the TNFT is being listed for sale, otherwise false.
      */
     function tnftSalePlaced(ITangibleNFT tnft, uint256 tokenId, bool place) external override {
-        require(msg.sender == marketplace);
+        require(msg.sender == marketplace, "NMP");
 
         if (place) {
             //check if something from this category is on sale already
@@ -80,10 +80,11 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
             //something is added to marketplace
 
             tnftTokensOnSale[tnft].push(tokenId);
-            TnftSaleItem memory tsi = TnftSaleItem(
-                tnft,
-                tokenId,
-                (tnftTokensOnSale[tnft].length - 1)
+            TnftSaleItem memory tsi = TnftSaleItem({
+                tnft:tnft,
+                tokenId:tokenId,
+                indexInCurrentlySelling:tnftTokensOnSale[tnft].length - 1
+            }
             );
             tnftSaleMapper[tnft][tokenId] = tsi;
         } else {
@@ -107,16 +108,22 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
      * @param index Index in the `tnftTokensOnSale` we're removing the token from.
      */
     function _removeCurrentlySellingTnft(ITangibleNFT tnft, uint256 index) internal {
-        require(index < tnftTokensOnSale[tnft].length, "IndexT");
-
+        uint256[] storage tokenIds = tnftTokensOnSale[tnft];
+        require(index < tokenIds.length, "IndexT");
+        // no need to do anything if it's the last token
+        // just pop it
+        if (index == tokenIds.length - 1) {
+            tokenIds.pop();
+            return;
+        }
         //take last token
-        uint256 tokenId = tnftTokensOnSale[tnft][tnftTokensOnSale[tnft].length - 1];
+        uint256 tokenId = tokenIds[tokenIds.length - 1];
 
         //replace it with the one we are removing
-        tnftTokensOnSale[tnft][index] = tokenId;
+        tokenIds[index] = tokenId;
         //set it's new index in saleData
         tnftSaleMapper[tnft][tokenId].indexInCurrentlySelling = index;
-        tnftTokensOnSale[tnft].pop();
+        tokenIds.pop();
     }
 
     /**
@@ -141,6 +148,7 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
      * @param _marketplace Address of new Marketplace contract.
      */
     function setMarketplace(address _marketplace) external onlyFactoryOwner {
+        require(_marketplace != address(0), "Mkt 0");
         marketplace = _marketplace;
     }
 
