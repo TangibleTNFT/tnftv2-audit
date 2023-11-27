@@ -23,7 +23,7 @@ module.exports = {
     mumbai: {
       url: process.env.INFURA_URL_MUMBAI,
       accounts: [process.env.PK1, process.env.PK2, process.env.PK2],
-      //gasPrice: 30000000000
+      gasPrice: 2000000000
     },
     polygon: {
       url: process.env.INFURA_URL_POLYGON,

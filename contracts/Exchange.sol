@@ -84,6 +84,9 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         
         bytes memory tokenized = abi.encodePacked(tokenInAddress, tokenOutAddress);
         bytes memory tokenizedReverse = abi.encodePacked(tokenOutAddress, tokenInAddress);
+        if(_secondsAgo == 0) {
+            _secondsAgo = DEFAULT_SECONDS_AGO;
+        }
         // set fees
         SwapRouter memory swapRouter = SwapRouter(
             {
@@ -183,6 +186,8 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         if(swapRouter.secondsAgo == 0) {
             swapRouter.secondsAgo = DEFAULT_SECONDS_AGO;
         }
+        // adjust the amountIn to the fee from pool
+        amountIn = amountIn - (amountIn * swapRouter.fee / oracle.POOL_FEE_100());
 
         amountOut = oracle.consultWithFee(tokenIn, uint128(amountIn), tokenOut, swapRouter.secondsAgo, swapRouter.fee);
     }

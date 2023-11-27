@@ -44,7 +44,8 @@ describe.only("TNFT Ecosystem", () => {
             nft.target,
             usdr.target,
             tokenId,
-            years
+            years,
+            20n * 10n ** 9n,
         );
 
         const bal2 = await usdr.balanceOf(tangibleLabs.address);
@@ -135,15 +136,15 @@ describe.only("TNFT Ecosystem", () => {
         await currencyFeed.waitForDeployment(); 
         console.log("owner factory: " + await factoryContract.owner());
 
-        await currencyFeed.setCurrencyConversionPremium("GBP", 1000000);
         await currencyFeed.setISOCurrencyData("GBP", 826);
         await currencyFeed.setISOCountryData("GBR", 826);
         await currencyFeed.setISOCurrencyData("USD", 840);
         await currencyFeed.setISOCountryData("USA", 840);
         await currencyFeed.setISOCurrencyData("XAU", 959);
         await currencyFeed.setCurrencyFeed("GBP", mockGBPOracle.target);
+        await currencyFeed.setCurrencyConversionPremium("GBP", 1000000);
         await currencyFeed.setCurrencyFeed("XAU", mockOracle.target);
-        await currencyFeed.setCurrencyFeed("USA", mockUSDoracle.target);
+        await currencyFeed.setCurrencyFeed("USD", mockUSDoracle.target);
         // ENABLE TO HAVE CONVERSION PREMIUM
         // await currencyFeed.setCurrencyConversionPremium("GBP", 1000000);
 
@@ -173,53 +174,43 @@ describe.only("TNFT Ecosystem", () => {
 
         //deploy Exchange
         const Exchange = await ethers.getContractFactory("ExchangeV2");
-        exchange = await upgrades.deployProxy(Exchange, [factoryContract.target]);
+        exchange = await upgrades.deployProxy(Exchange, [factoryContract.target, mockrouter.target]);
         await exchange.waitForDeployment();
 
-        tx = await exchange.addRouterForTokens(
+        tx = await exchange.addFeesTokens(
             usdr.target,
             dai.target,
             mockrouter.target,
-            [],
-            [],
-            true, // simple swap
-            true
+            3000,
+            0
         );
-        tx = await exchange.addRouterForTokens(
+        tx = await exchange.addFeesTokens(
             usdc.target,
             dai.target,
             mockrouter.target,
-            [{from:usdc.target, to: usdr.target, stable:true}, {from:usdr.target, to: dai.target, stable:true}],
-            [{from:dai.target, to: usdr.target, stable:true}, {from:usdr.target, to: usdc.target, stable:true}],
-            true, // simple swap
-            true
+            3000,
+            0
         );
-        tx = await exchange.addRouterForTokens(
+        tx = await exchange.addFeesTokens(
             usdr.target,
             usdc.target,
             mockrouter.target,
-            [],
-            [],
-            true, // simple swap
-            true
+            3000,
+            0
         );
-        tx = await exchange.addRouterForTokens(
+        tx = await exchange.addFeesTokens(
             usdr.target,
             usdc.target,
             mockrouter.target,
-            [],
-            [],
-            true, // simple swap
-            true
+            3000,
+            0
         );
-        tx = await exchange.addRouterForTokens(
+        tx = await exchange.addFeesTokens(
             usdr.target,
             tngbl.target,
             mockrouter.target,
-            [],
-            [],
-            true, // simple swap
-            false
+            3000,
+            0
         );
 
         //deploy SellFeeDistributor
@@ -884,7 +875,8 @@ describe.only("TNFT Ecosystem", () => {
                 goldTnft,
                 dai.target,
                 1,
-                1
+                1,
+                20n * 10n ** 18n
             )).to.be.revertedWith("TNAPP");
             
         })
@@ -895,7 +887,8 @@ describe.only("TNFT Ecosystem", () => {
                 goldTnft,
                 usdc.target,
                 1,
-                1
+                1,
+                20n * 10n ** 18n
             )).to.be.revertedWith("!0S");
             
         })
@@ -932,7 +925,20 @@ describe.only("TNFT Ecosystem", () => {
 
         it("should fetch batch oracle prices", async () => {
 
+            const latestAnswer = await priceManager.itemPriceBatchFingerprints(realEstate,usdc.target,[2166,2175]);
             
+            expect(latestAnswer[0][0]).to.be.equal(68768450000);
+            expect(latestAnswer[0][1]).to.be.equal(514900740000);
+            expect(latestAnswer[1][0]).to.be.equal(1);
+            expect(latestAnswer[1][1]).to.be.equal(1);
+            expect(latestAnswer[2][0]).to.be.equal(9384840000);
+            expect(latestAnswer[2][1]).to.be.equal(63621460000);
+            
+        })
+
+        it("should fetch batch oracle prices - no conv premium", async () => {
+
+            await currencyFeed.setCurrencyConversionPremium("GBP", 0);
             const latestAnswer = await priceManager.itemPriceBatchFingerprints(realEstate,usdc.target,[2166,2175]);
             
             expect(latestAnswer[0][0]).to.be.equal(68243500000);
@@ -961,8 +967,8 @@ describe.only("TNFT Ecosystem", () => {
             
             const lAnswer= await priceManager.itemPriceBatchTokenIds(realEstate,usdc.target,[0x01n]);
             
-            expect(lAnswer.weSellAt[0]).to.be.equal(68243500000);
-            expect(lAnswer.tokenizationCost[0]).to.be.equal(9313200000);
+            expect(lAnswer.weSellAt[0]).to.be.equal(68768450000);
+            expect(lAnswer.tokenizationCost[0]).to.be.equal(9384840000);
             
         })
 
@@ -970,7 +976,7 @@ describe.only("TNFT Ecosystem", () => {
 
             const beforeSaleVendorBalance = await usdc.balanceOf(tangibleLabs.address);
             const beforeSaleBuyerBalance = await usdc.balanceOf(randomUser.address);
-            const tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target ,1, 1);
+            const tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target ,1, 1, 20n * 10n ** 18n);
             result = await tx.wait();
 
             const [boughtTokenEvent] = await result.logs.filter(
@@ -1008,7 +1014,7 @@ describe.only("TNFT Ecosystem", () => {
             await factoryContract.connect(tangibleLabs).configurePaymentWallet(randomUser4.address);
             const beforeSaleVendorBalance = await usdc.balanceOf(randomUser4.address);
             const beforeSaleBuyerBalance = await usdc.balanceOf(randomUser.address);
-            const tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target ,1, 1);
+            const tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target ,1, 1, 20n * 10n ** 18n);
             result = await tx.wait();
 
             const [boughtTokenEvent] = await result.logs.filter(
@@ -1058,7 +1064,7 @@ describe.only("TNFT Ecosystem", () => {
             // now purchase
             const beforeSaleVendorBalance = await usdr.balanceOf(tangibleLabs.address);
             const beforeSaleBuyerBalance = await usdr.balanceOf(randomUser.address);
-            const tx = await marketplace.connect(randomUser).buy(goldTnft, 0x01n ,1);
+            const tx = await marketplace.connect(randomUser).buy(goldTnft, 0x01n ,1, 20n * 10n ** 18n, lot[0].paymentToken, lot[0].price);
             result = await tx.wait();
 
             const [boughtTokenEvent] = await result.logs.filter(
@@ -1151,36 +1157,52 @@ describe.only("TNFT Ecosystem", () => {
 
         it("should purchase gold from marketplace",async () => {
             const userBalance = await usdr.balanceOf(randomUser.address);
-            await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1);
+            const lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+            await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
             expect(await GoldNFT.ownerOf(goldToken1)).equal(randomUser.address);
+        })
+
+        it("should not purchase gold from marketplace - too expensive",async () => {
+            const userBalance = await usdr.balanceOf(randomUser.address);
+            const lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+            expect(marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price-20n)).to.be.revertedWith("OC");
+        })
+
+        it("should not purchase gold from marketplace - different token",async () => {
+            const userBalance = await usdr.balanceOf(randomUser.address);
+            const lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+            expect(marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, dai.address, lot.price)).to.be.revertedWith("OC");
         })
 
         it("shouldn't purchase gold from marketplace - paused but buy after unpaused",async () => {
             const userBalance = await usdr.balanceOf(randomUser.address);
             await GoldNFT.connect(tangibleLabs).togglePause();
-            await expect( marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1))
+            const lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+            await expect( marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price))
                 .to.be.revertedWithCustomError(GoldNFT,"EnforcedPause");
             await GoldNFT.connect(tangibleLabs).togglePause();
             
-            await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1)
+            await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
             expect(await GoldNFT.ownerOf(goldToken1)).equal(randomUser.address);
         })
 
         it("should not purchase gold from marketplace - fingerprint doesn't exist",async () => {
-
-            await expect(marketplace.connect(randomUser).buy(goldTnft, 0x0200000000000000000000000000000004n, 1))
+            const lot = await marketplace.marketplaceLot(goldTnft, 0x0200000000000000000000000000000004n);
+            await expect(marketplace.connect(randomUser).buy(goldTnft, 0x0200000000000000000000000000000004n, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price))
                 .to.be.revertedWith("fingerprint must exist");
         })
 
         it("should purchase all gold from marketplace ",async () => {
-            
-            let tx = await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1);
+            let lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+            let tx = await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
             let result = await tx.wait();
 
-            tx = await marketplace.connect(randomUser2).buy(goldTnft, goldToken2, 1);
+            lot = await marketplace.marketplaceLot(goldTnft, goldToken2);
+            tx = await marketplace.connect(randomUser2).buy(goldTnft, goldToken2, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
             result = await tx.wait();
 
-            tx = await marketplace.connect(randomUser3).buy(goldTnft, goldToken3, 1);
+            lot = await marketplace.marketplaceLot(goldTnft, goldToken3);
+            tx = await marketplace.connect(randomUser3).buy(goldTnft, goldToken3, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
             result = await tx.wait();
 
             expect(await GoldNFT.ownerOf(goldToken1)).equal(randomUser.address);
@@ -1191,14 +1213,21 @@ describe.only("TNFT Ecosystem", () => {
         })
 
         it("should purchase and mint all gold and fail when no more gold is left",async () => {
-            let tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target, 1, 1);
+            let tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target, 1, 1, 20n * 10n ** 18n);
             await tx.wait();
             
-            tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target,1, 1);
+            tx = await marketplace.connect(randomUser).buyUnminted(goldTnft, usdc.target,1 ,1, 20n * 10n ** 18n);
             await tx.wait();
             
-            expect( marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target, 1, 1))
+            expect( marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target,1, 1, 20n * 10n ** 18n))
                 .to.be.revertedWith("!0S");
+            
+        })
+
+        it("should fail purchase - amount for storage is too much",async () => {
+            
+            expect( marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target, 1, 1, 10n * 10n ** 18n))
+                .to.be.revertedWith("MAMT");
             
         })
 
@@ -1206,7 +1235,7 @@ describe.only("TNFT Ecosystem", () => {
             const deplBalance = await usdc.balanceOf(tangibleLabs.address);
             await factoryContract.connect(tangibleLabs).setRequireWhitelistCategory(realEstate, true);
             await factoryContract.connect(tangibleLabs).whitelistBuyer(realEstate, randomUser.address, true);
-            const tx1 = await marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1);
+            const tx1 = await marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1, 0);
             await tx1.wait();
 
             await RealEstateNFT.connect(randomUser)["safeTransferFrom(address,address,uint256)"](randomUser.address, deployer.address, 0x01n);
@@ -1215,7 +1244,7 @@ describe.only("TNFT Ecosystem", () => {
         })
 
         it("shouldn't buy house, storage is not required whitelist not allowed",async () => {
-            await expect ( marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1))
+            await expect ( marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1, 0))
                 .to.be.revertedWith("OWL"); 
         })
  
@@ -1224,16 +1253,19 @@ describe.only("TNFT Ecosystem", () => {
             let goldToken5, goldToken4;
             beforeEach(async () => {
                 //buy gold
-                let tx = await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1);
+                let lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+                let tx = await marketplace.connect(randomUser).buy(goldTnft, goldToken1, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
                 let result = await tx.wait();
-                
-                tx = await marketplace.connect(randomUser2).buy(goldTnft, goldToken2, 1);
+
+                lot = await marketplace.marketplaceLot(goldTnft, goldToken2);
+                tx = await marketplace.connect(randomUser2).buy(goldTnft, goldToken2, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
                 result = await tx.wait();
                 
-                tx = await marketplace.connect(randomUser3).buy(goldTnft, goldToken3, 1);
+                lot = await marketplace.marketplaceLot(goldTnft, goldToken3);
+                tx = await marketplace.connect(randomUser3).buy(goldTnft, goldToken3, 1, 20n * 10n ** 18n, lot.paymentToken, lot.price);
                 result = await tx.wait();
                 //buy gold
-                tx = await marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target, 1, 1);
+                tx = await marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target, 1, 1, 20n * 10n ** 18n);
                 result = await tx.wait();
                 
                 const [boughtTokenEvent] = await result.logs.filter(
@@ -1241,7 +1273,7 @@ describe.only("TNFT Ecosystem", () => {
                 );
                 goldToken4 = boughtTokenEvent.args.tokenId;
 
-                tx = await marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target,1, 1);
+                tx = await marketplace.connect(randomUser).buyUnminted(goldTnft,usdc.target,1, 1, 20n * 10n ** 18n);
                 result = await tx.wait();
                 const [boughtTokenEvent1] = await result.logs.filter(
                     (evt) => evt.eventName === "TnftBought"
@@ -1273,7 +1305,7 @@ describe.only("TNFT Ecosystem", () => {
                 const lot = await tangibleReaderHelper.lotBatch(goldTnft, [goldToken1]);
                 expect(lot[0].price).equal(0);
 
-                const tx2 = await marketplace.connect(randomUser2).buy(goldTnft,goldToken1, 0);
+                const tx2 = await marketplace.connect(randomUser2).buy(goldTnft,goldToken1, 0, 0, lot[0].paymentToken, lot[0].price);
                 result = await tx2.wait();
                 const [boughtTokenEvent1] = await result.logs.filter(
                     (evt) => evt.eventName === "TnftBought"
@@ -1286,7 +1318,8 @@ describe.only("TNFT Ecosystem", () => {
             })
 
             it("shouldn't double sell already sold item", async () => {
-                await expect( marketplace.connect(randomUser2).buy(goldTnft,goldToken1, 0))
+                const lot = await marketplace.marketplaceLot(goldTnft, goldToken1);
+                await expect( marketplace.connect(randomUser2).buy(goldTnft,goldToken1, 0, 0, lot.paymentToken, lot.price))
                     .to.be.revertedWith("NLO");
             })
 
@@ -1314,7 +1347,8 @@ describe.only("TNFT Ecosystem", () => {
                 
                 expect(itemsOnSale[0]).equal(goldTnft);
 
-                await marketplace.connect(randomUser).buy(goldTnft, goldToken2,0);
+                const lot = await marketplace.marketplaceLot(goldTnft, goldToken2);
+                await marketplace.connect(randomUser).buy(goldTnft, goldToken2,0, 0, lot.paymentToken, lot.price);
                 await expect(await marketplace.connect(randomUser).sellBatch(goldTnft,usdr.target, [goldToken5, goldToken4],[0,0], ethers.ZeroAddress))
                 .to.be.ok;
 
@@ -1344,7 +1378,8 @@ describe.only("TNFT Ecosystem", () => {
             it("should stop sale of multiple items", async () => {
                 tx = await marketplace.connect(randomUser2).sellBatch(goldTnft,usdr.target, [goldToken2], [0], ethers.ZeroAddress);
                 await tx.wait();
-                await marketplace.connect(randomUser).buy(goldTnft, goldToken2,0);
+                const lot = await marketplace.marketplaceLot(goldTnft, goldToken2);
+                await marketplace.connect(randomUser).buy(goldTnft, goldToken2,0, 0, lot.paymentToken, lot.price);
                 await expect(await marketplace.connect(randomUser).sellBatch(goldTnft,usdr.target, [goldToken2, goldToken1],[0,0], ethers.ZeroAddress))
                 .to.be.ok;
 
@@ -1434,6 +1469,24 @@ describe.only("TNFT Ecosystem", () => {
                     await expect( await GoldNFT.ownerOf(goldToken1)).to.be.eq(tangibleLabs.address)
                 });
 
+                it("should not seize TNFT more than 1y 6m has passed, not blacklisted", async () => {
+                    await hre.timeAndMine.increaseTime("2y");
+                    await hre.timeAndMine.increaseTime("200 days");
+                    await RealEstateNFT.connect(tangibleLabs).toggleStorageRequired(false);
+                    // await RealEstateNFT.connect(tangibleLabs).blacklistToken(goldToken1, false);
+                    await factoryContract.connect(tangibleLabs).seizeTnft(goldTnft, [goldToken1]);
+                    await expect( await GoldNFT.ownerOf(goldToken1)).to.be.eq(tangibleLabs.address)
+                });
+
+                it("should  seize TNFT more than 1y 6m has passed, it is blacklisted", async () => {
+                    await hre.timeAndMine.increaseTime("2y");
+                    await hre.timeAndMine.increaseTime("200 days");
+                    await RealEstateNFT.connect(tangibleLabs).toggleStorageRequired(false);
+                    await RealEstateNFT.connect(tangibleLabs).blacklistToken(goldToken1, false);
+                    await factoryContract.connect(tangibleLabs).seizeTnft(goldTnft, [goldToken1]);
+                    await expect( await GoldNFT.ownerOf(goldToken1)).to.be.eq(tangibleLabs.address)
+                });
+
                 it("should seize TNFT more than 1y 6m has passed and burn", async () => {
                     await hre.timeAndMine.increaseTime("2y");
                     await hre.timeAndMine.increaseTime("200 days");
@@ -1501,9 +1554,10 @@ describe.only("TNFT Ecosystem", () => {
 
             realtyToken1 = tokennIds[0];
             realtyToken2 = tokennIds1[0];
-
-            await marketplace.connect(randomUser).buy(realEstate, realtyToken1, 0);
-            await marketplace.connect(randomUser2).buy(realEstate, realtyToken2, 0);
+            let lot = await marketplace.marketplaceLot(realEstate, realtyToken1);
+            await marketplace.connect(randomUser).buy(realEstate, realtyToken1, 0, 0, lot.paymentToken, lot.price);
+            lot = await marketplace.marketplaceLot(realEstate, realtyToken2);
+            await marketplace.connect(randomUser2).buy(realEstate, realtyToken2, 0, 0, lot.paymentToken, lot.price);
 
             expect(await RealEstateNFT.ownerOf(realtyToken1)).to.be.equal(randomUser.address);
             expect(await RealEstateNFT.ownerOf(realtyToken2)).to.be.equal(randomUser2.address);
@@ -1943,7 +1997,8 @@ describe.only("TNFT Ecosystem", () => {
                 await marketplace.connect(randomUser).sellBatch(realEstate, usdr.target, [realtyToken1], [50_000_000000],ethers.ZeroAddress);
                 // purchase 
                 const balanceBefore = await usdc.balanceOf(randomUser.address);
-                await marketplace.connect(randomUser2).buy(realEstate, realtyToken1, 0);
+                const lot = await marketplace.marketplaceLot(realEstate, realtyToken1);
+                await marketplace.connect(randomUser2).buy(realEstate, realtyToken1, 0, 0, lot.paymentToken, lot.price);
                 
                 const balanceAfter = await usdc.balanceOf(randomUser.address);
                 const rentInfo1 = await RentManager.rentInfo(realtyToken1);

@@ -14,12 +14,14 @@ import "./abstract/FactoryModifiers.sol";
 contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
     // ~ Constants ~
 
+    // 100% pool fee, used for calculating amountIn for given pool fee
+    uint24 public constant POOL_FEE_100 = 100_0000;
     // 0.3% pool fee
     uint24 public constant POOL_FEE_03 = 3000;
     // 0.01% pool fee
     uint24 public constant POOL_FEE_001 = 100;
     // 1% pool fee
-    uint24 public constant POOL_FEE_1 = 10000;
+    uint24 public constant POOL_FEE_1 = 1_0000;
     // 0.05% pool fee
     uint24 public constant POOL_FEE_005 = 500;
     // Default seconds ago for the oracle
