@@ -132,7 +132,7 @@ contract TNFTMetadata is FactoryModifiers {
     ) external onlyFactoryOwner {
         uint256 length = _featureList.length;
         require(length == _featureDescriptions.length, "not the same size");
-        uint256 featureListLength = length;
+        uint256 featureListLength = featureList.length;
         for (uint256 i; i < length; ) {
             uint256 item = _featureList[i];
             FeatureInfo storage feature = featureInfo[item];
