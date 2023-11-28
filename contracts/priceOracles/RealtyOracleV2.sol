@@ -95,7 +95,8 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
         AggregatorV3Interface priceFeedNativeToUSD = currencyFeed.currencyPriceFeedsISONum(
             currencyISONum
         );
-        (, int256 price, , , ) = priceFeedNativeToUSD.latestRoundData();
+        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeedNativeToUSD.latestRoundData();
+        require(block.timestamp - _latestTimeStamp <= 1 days, "Stale currency feed");
         if (price < 0) {
             price = 0;
         }

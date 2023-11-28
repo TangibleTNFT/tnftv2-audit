@@ -158,7 +158,7 @@ contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
             uint80 answeredInRound
         )
     {
-        return (1, latestAnswer(), 1, 1, 1);
+        return (1, latestAnswer(), block.timestamp, block.timestamp, 1);
     }
 
     /**
@@ -188,7 +188,7 @@ contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
     }
 
     function getTimestamp(uint256 roundId) external view override returns (uint256) {
-        return 0;
+        return block.timestamp;
     }
 
     function latestRound() external view override returns (uint256) {
@@ -196,7 +196,7 @@ contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
     }
 
     function latestTimestamp() external view override returns (uint256) {
-        return 0;
+        return block.timestamp;
     }
 
     function getRoundData(
