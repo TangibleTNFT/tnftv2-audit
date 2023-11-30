@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/IExchange.sol";
 import "./interfaces/ITNGBLV3Oracle.sol";
-import "../pearl-v2/contracts/interfaces/periphery/ISwapRouter.sol";
+import "./univ3-periphery/ISwapRouter.sol";
 
 /**
  * @title Exchange
@@ -38,7 +38,7 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
     // ~ Events ~
 
     /**
-     * 
+     *
      * @param oracle_new New oracle address.
      * @param oracle_old Old oracle address.
      */
@@ -80,24 +80,27 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         uint32 _secondsAgo
     ) external onlyFactoryOwner {
         require(tokenInAddress != tokenOutAddress, "same token");
-        require(_fee == oracle.POOL_FEE_001() || _fee == oracle.POOL_FEE_005() || _fee == oracle.POOL_FEE_03() || _fee == oracle.POOL_FEE_1(), "invalid fee");
-        
+        require(
+            _fee == oracle.POOL_FEE_001() ||
+                _fee == oracle.POOL_FEE_005() ||
+                _fee == oracle.POOL_FEE_03() ||
+                _fee == oracle.POOL_FEE_1(),
+            "invalid fee"
+        );
+
         bytes memory tokenized = abi.encodePacked(tokenInAddress, tokenOutAddress);
         bytes memory tokenizedReverse = abi.encodePacked(tokenOutAddress, tokenInAddress);
-        if(_secondsAgo == 0) {
+        if (_secondsAgo == 0) {
             _secondsAgo = DEFAULT_SECONDS_AGO;
         }
         // set fees
-        SwapRouter memory swapRouter = SwapRouter(
-            {
-                swap: _swapRouter,
-                fee: _fee,
-                secondsAgo: _secondsAgo
-            }
-        );
+        SwapRouter memory swapRouter = SwapRouter({
+            swap: _swapRouter,
+            fee: _fee,
+            secondsAgo: _secondsAgo
+        });
         routers[tokenized] = swapRouter;
         routers[tokenizedReverse] = swapRouter;
-        
     }
 
     /**
@@ -116,7 +119,11 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
      * @param tokenOutAddress token out address
      * @param _secondsAgo  seconds ago used for the oracle
      */
-    function setSecondsAgo(address tokenInAddress, address tokenOutAddress, uint32 _secondsAgo) external onlyFactoryOwner {
+    function setSecondsAgo(
+        address tokenInAddress,
+        address tokenOutAddress,
+        uint32 _secondsAgo
+    ) external onlyFactoryOwner {
         require(tokenInAddress != tokenOutAddress, "same token");
         bytes memory tokenized = abi.encodePacked(tokenInAddress, tokenOutAddress);
         bytes memory tokenizedReverse = abi.encodePacked(tokenOutAddress, tokenInAddress);
@@ -163,7 +170,6 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
                 sqrtPriceLimitX96: 0
             })
         );
-
     }
 
     /**
@@ -178,17 +184,26 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         address tokenOut,
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
-        
         bytes memory tokenized = abi.encodePacked(tokenIn, tokenOut);
         SwapRouter memory swapRouter = routers[tokenized];
-        
+
         require(swapRouter.swap != address(0), "router 0 ng");
-        if(swapRouter.secondsAgo == 0) {
+        if (swapRouter.secondsAgo == 0) {
             swapRouter.secondsAgo = DEFAULT_SECONDS_AGO;
         }
         // adjust the amountIn to the fee from pool
-        amountIn = amountIn - (amountIn * swapRouter.fee / oracle.POOL_FEE_100());
+        // adding 0.1% more for slippage, because with just fee
+        // I'm getting error too low output amount on exactInputSingle
+        amountIn =
+            amountIn -
+            ((amountIn * (swapRouter.fee + oracle.POOL_FEE_01())) / oracle.POOL_FEE_100());
 
-        amountOut = oracle.consultWithFee(tokenIn, uint128(amountIn), tokenOut, swapRouter.secondsAgo, swapRouter.fee);
+        amountOut = oracle.consultWithFee(
+            tokenIn,
+            uint128(amountIn),
+            tokenOut,
+            swapRouter.secondsAgo,
+            swapRouter.fee
+        );
     }
 }

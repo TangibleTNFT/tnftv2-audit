@@ -1,4 +1,4 @@
-[submodule "pearl-v2"]
-	path = pearl-v2
-	url = git@github.com:Pearl-Finance/pearl-v2.git
-	branch = dev
+[submodule "uni-v3-core"]
+	path = uni-v3-core
+	url = git@github.com:Uniswap/v3-core.git
+	branch = 0.8

@@ -42,8 +42,14 @@ interface ITNGBLV3Oracle {
     ) external view returns (uint256);
 
     function POOL_FEE_001() external view returns (uint24);
+
     function POOL_FEE_005() external view returns (uint24);
+
     function POOL_FEE_03() external view returns (uint24);
+
     function POOL_FEE_1() external view returns (uint24);
+
     function POOL_FEE_100() external view returns (uint24);
+
+    function POOL_FEE_01() external view returns (uint24);
 }

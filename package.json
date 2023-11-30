@@ -31,9 +31,6 @@
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
     "@openzeppelin/hardhat-upgrades": "2.3.3",
-    "@uniswap/v2-periphery": "^1.1.0-beta.0",
-    "@uniswap/v3-core": "^1.0.1",
-    "@uniswap/v3-periphery": "^1.4.4",
     "canonical-weth": "^1.4.0"
   },
   "devDependencies": {

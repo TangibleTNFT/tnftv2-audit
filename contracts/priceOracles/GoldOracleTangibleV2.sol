@@ -87,7 +87,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
     function _latestAnswer(uint256 _fingerprint) internal view returns (uint256) {
         require(goldBars[_fingerprint].grams != 0, "fingerprint must exist");
         AggregatorV3Interface priceFeed = currencyFeed.currencyPriceFeedsISONum(currencyISONum);
-        (, int256 price, ,uint256 _latestTimeStamp , ) = priceFeed.latestRoundData();
+        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeed.latestRoundData();
         require(block.timestamp - _latestTimeStamp <= 1 days, "Stale XAU data");
         if (price < 0) {
             price = 0;
@@ -330,7 +330,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
         uint256 length = fingerprints.length;
         currency = currencyISONum;
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ) {
             nativePrice += goldBars[fingerprints[i]].grams;
             unchecked {
                 ++i;

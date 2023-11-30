@@ -81,11 +81,10 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
 
             tnftTokensOnSale[tnft].push(tokenId);
             TnftSaleItem memory tsi = TnftSaleItem({
-                tnft:tnft,
-                tokenId:tokenId,
-                indexInCurrentlySelling:tnftTokensOnSale[tnft].length - 1
-            }
-            );
+                tnft: tnft,
+                tokenId: tokenId,
+                indexInCurrentlySelling: tnftTokensOnSale[tnft].length - 1
+            });
             tnftSaleMapper[tnft][tokenId] = tsi;
         } else {
             //something is removed from marketplace

@@ -304,15 +304,11 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     ) external view returns (uint256 nativePrice, uint256 currency) {
         uint256 length = fingerprints.length;
         require(length > 0, "no input");
-        IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(
-            fingerprints[0]
-        );
+        IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(fingerprints[0]);
         currency = data.currency;
         nativePrice += data.weSellAt + data.lockedAmount;
         for (uint256 i = 1; i < length; ) {
-            data = chainlinkRWAOracle.fingerprintData(
-                fingerprints[i]
-            );
+            data = chainlinkRWAOracle.fingerprintData(fingerprints[i]);
             require(currency == data.currency, "not same currency");
 
             nativePrice += data.weSellAt + data.lockedAmount;

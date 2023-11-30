@@ -11,25 +11,23 @@ interface ERC20Mintable {
 }
 
 interface ISwapRouter {
-  struct ExactInputSingleParams {
-    address tokenIn;
-    address tokenOut;
-    uint24 fee;
-    address recipient;
-    uint256 deadline;
-    uint256 amountIn;
-    uint256 amountOutMinimum;
-    uint160 sqrtPriceLimitX96;
-  }
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
 
-  function exactInputSingle(
-    ExactInputSingleParams calldata params
-  ) external payable returns (uint256 amountOut);
-
+    function exactInputSingle(
+        ExactInputSingleParams calldata params
+    ) external payable returns (uint256 amountOut);
 }
 
 interface ITNGBLV3Oracle {
-
     function consultWithFee(
         address tokenIn,
         uint128 amountIn,
@@ -39,8 +37,11 @@ interface ITNGBLV3Oracle {
     ) external view returns (uint256);
 
     function POOL_FEE_001() external view returns (uint24);
+
     function POOL_FEE_005() external view returns (uint24);
+
     function POOL_FEE_03() external view returns (uint24);
+
     function POOL_FEE_1() external view returns (uint24);
 }
 
@@ -57,6 +58,7 @@ contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
     uint24 public constant POOL_FEE_005 = 500;
     // Default seconds ago for the oracle
     uint32 public constant DEFAULT_SECONDS_AGO = 300;
+
     function toDecimals(
         uint256 amount,
         uint8 fromDecimal,
@@ -96,5 +98,4 @@ contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
         ERC20Mintable(params.tokenIn).burn(params.amountIn);
         ERC20Mintable(params.tokenOut).mint(params.recipient, amountOut);
     }
-
 }

@@ -70,7 +70,10 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
         bool _isMainnet
     ) external initializer {
         __FactoryModifiers_init(_factory);
-        require(_revenueShare != address(0) && _revenueToken != address(0) && _rwaToken != address(0), "ZA 0");
+        require(
+            _revenueShare != address(0) && _revenueToken != address(0) && _rwaToken != address(0),
+            "ZA 0"
+        );
         REVENUE_TOKEN = IERC20(_revenueToken);
         RWA_TOKEN = IERC20(_rwaToken);
         revenueShare = _revenueShare;
@@ -94,7 +97,10 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      * @param _revenueToken New revenue token address.
      */
     function setRevenueToken(address _revenueToken) external onlyFactoryOwner {
-        require((_revenueToken != address(0)) && (_revenueToken != address(REVENUE_TOKEN)), "Wrong revenue token");
+        require(
+            (_revenueToken != address(0)) && (_revenueToken != address(REVENUE_TOKEN)),
+            "Wrong revenue token"
+        );
         REVENUE_TOKEN = IERC20(_revenueToken);
     }
 

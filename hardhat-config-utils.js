@@ -51,7 +51,7 @@ const networkConfig = {
         usdtAddress: '0x98D75A58F5bf3Cac470b6CC886d4F9932dCB5328',
         usdrAddress: '0x8885a6E2f1F4BC383963eD848438A8bEC243886F',
         ustbAddress: '0x71395cC9211dc43220EBe3Bb0466d482D6ef5335',
-        pearlRouter: "0xe488c4c1C711CC309e99aa300bb5c8D6e47062ca",
+        pearlRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
         pearlFactory: "0xB4cF5a388778046aAc5fB33AC0e99107a2403Ed7",
         chainLinkGoldOracle: '',
         chainLinkGBPOracle: '',

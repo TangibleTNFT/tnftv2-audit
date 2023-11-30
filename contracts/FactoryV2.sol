@@ -424,7 +424,6 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         uint256 tokenId,
         uint256 _years
     ) external onlyMarketplace returns (uint256) {
-
         bool storagePriceFixed = tnft.adjustStorage(tokenId, _years);
         //amount to pay
         uint256 amount;
@@ -523,7 +522,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
         // send minted tokens to marketplace. when price is 0 - use oracle
         uint256 tokenIdsLength = tokenIds.length;
-        for (uint256 i = 0; i < tokenIdsLength;) {
+        for (uint256 i = 0; i < tokenIdsLength; ) {
             //decrease stock
             priceManager.oracleForCategory(voucher.token).decrementSellStock(voucher.fingerprint);
             // send NFT
@@ -572,7 +571,9 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         uint256 _tnftType
     ) external onlyCategoryMinter returns (ITangibleNFT) {
         if (msg.sender != tangibleLabs) {
-            mapping(uint256 => uint256) storage _numCategoriesToMintSender = numCategoriesToMint[msg.sender];
+            mapping(uint256 => uint256) storage _numCategoriesToMintSender = numCategoriesToMint[
+                msg.sender
+            ];
             require(_numCategoriesToMintSender[_tnftType] > 0, "Can't create more");
             // reducing approved tnft creations
             unchecked {

@@ -299,7 +299,7 @@ contract TangibleNFTV2 is
     ) external onlyCategoryOwner(ITangibleNFT(address(this))) {
         require(decimals >= 0 && decimals <= 18, "wrong");
         // storagePricePerYear is directly related to storageDecimals
-        if (storageDecimals < decimals){
+        if (storageDecimals < decimals) {
             storagePricePerYear = storagePricePerYear * (10 ** (decimals - storageDecimals));
         } else if (storageDecimals > decimals) {
             storagePricePerYear = storagePricePerYear / (10 ** (storageDecimals - decimals));
@@ -434,7 +434,7 @@ contract TangibleNFTV2 is
             mapping(uint256 => FeatureInfo) storage featureInfo = tokenFeatureAdded[tokenId];
             require(featureInfo[feature].added, "!exist");
             // if element is the last one, just pop it
-            if(features.length != 1) {
+            if (features.length != 1) {
                 // take last element
                 uint256 last = features[features.length - 1];
                 // set it to index
@@ -700,7 +700,9 @@ contract TangibleNFTV2 is
     }
 
     function _shouldPayStorage() internal view returns (bool) {
-        return storageRequired && ((storagePriceFixed && storagePricePerYear != 0) || (!storagePriceFixed && storagePercentagePricePerYear != 0));
-
+        return
+            storageRequired &&
+            ((storagePriceFixed && storagePricePerYear != 0) ||
+                (!storagePriceFixed && storagePercentagePricePerYear != 0));
     }
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.21;
 
-import "../pearl-v2/contracts/interfaces/IPearlV2Factory.sol";
-import "../pearl-v2/contracts/libraries/OracleLibrary.sol";
+import "../uni-v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "./univ3-periphery/OracleLibrary.sol";
 import "./interfaces/ITNGBLV3Oracle.sol";
 import "./abstract/FactoryModifiers.sol";
 
@@ -30,6 +30,9 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
 
     // @dev Uniswap v3 factory address.
     address public uniV3Factory;
+
+    // 0.1% pool fee
+    uint24 public constant POOL_FEE_01 = 1000;
     // ~ Events ~
 
     /// @dev This event is emitted when the uniswap v3 factory is changed.
@@ -47,10 +50,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
      * @param _factory Address of  Factory contract.
      * @param _uniV3Factory Address of Uniswap V3 Factory contract.
      */
-    function initialize(
-        address _factory,
-        address _uniV3Factory
-    ) external initializer {
+    function initialize(address _factory, address _uniV3Factory) external initializer {
         __FactoryModifiers_init(_factory);
         require(_uniV3Factory != address(0), "ZA 0");
         emit UniFactoryChanged(_uniV3Factory, uniV3Factory);
@@ -148,6 +148,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
     ) external view override returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, fee);
     }
+
     function _consultWithFee(
         address tokenIn,
         uint128 amountIn,
@@ -174,7 +175,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         address tokenOut,
         uint24 fee
     ) internal view returns (address pool) {
-        pool = IPearlV2Factory(uniV3Factory).getPool(tokenIn, tokenOut, fee);
+        pool = IUniswapV3Factory(uniV3Factory).getPool(tokenIn, tokenOut, fee);
     }
 
     /**
@@ -199,7 +200,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
 
         // int56 since tick * time = int24 * uint32
         // 56 = 24 + 32
-        (int56[] memory tickCumulatives, ) = IPearlV2Pool(pool).observe(secondsAgos);
+        (int56[] memory tickCumulatives, ) = IUniswapV3Pool(pool).observe(secondsAgos);
 
         int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
 

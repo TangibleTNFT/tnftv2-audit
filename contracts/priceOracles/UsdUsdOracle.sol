@@ -113,7 +113,7 @@ interface AggregatorV2V3Interface is AggregatorInterface, AggregatorV3Interface 
 contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     /**
      * We simply return 1 for the latest answer, to support
-     * our flow in oracles when we do conversions from some other 
+     * our flow in oracles when we do conversions from some other
      * currencies to USD. In case the currency is indeed USD, we just multiply with 1.
      */
     function latestAnswer() public view override returns (int256) {

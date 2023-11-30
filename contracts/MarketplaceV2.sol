@@ -386,12 +386,7 @@ contract TNFTMarketplaceV2 is
         require(_years > 0, "YZ");
         IFactory _factory = IFactory(factory());
 
-        uint256 amount = _factory.adjustStorageAndGetAmount(
-            nft,
-            paymentToken,
-            tokenId,
-            _years
-        );
+        uint256 amount = _factory.adjustStorageAndGetAmount(nft, paymentToken, tokenId, _years);
         // make sure not to overpay
         if (_maxAmount != 0) {
             require(amount <= _maxAmount, "MAMT");
@@ -648,14 +643,13 @@ contract TNFTMarketplaceV2 is
         require(address(IFactory(factory()).category(ITangibleNFT(nft).name())) == nft, "Not TNFT");
 
         marketplaceLot[nft][tokenId] = Lot({
-            nft:ITangibleNFT(nft),
-            paymentToken:defUSD,
-            tokenId:tokenId,
-            seller:seller,
-            price:price,
-            designatedBuyer:address(0)
-        }
-        );
+            nft: ITangibleNFT(nft),
+            paymentToken: defUSD,
+            tokenId: tokenId,
+            seller: seller,
+            price: price,
+            designatedBuyer: address(0)
+        });
         _updateTrackerTnft(ITangibleNFT(nft), tokenId, true);
 
         return IERC721Receiver.onERC721Received.selector;

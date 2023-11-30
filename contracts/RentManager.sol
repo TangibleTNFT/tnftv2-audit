@@ -378,7 +378,9 @@ contract RentManager is IRentManager, FactoryModifiers {
         return rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
     }
 
-    function _claimableRentInfoForToken(uint256 tokenId) internal view returns (uint256 claimable, RentInfo memory rInfo) {
+    function _claimableRentInfoForToken(
+        uint256 tokenId
+    ) internal view returns (uint256 claimable, RentInfo memory rInfo) {
         RentInfo storage rent = rentInfo[tokenId];
         if (rInfo.distributionRunning) {
             claimable = rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
