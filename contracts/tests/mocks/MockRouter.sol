@@ -43,6 +43,8 @@ interface ITNGBLV3Oracle {
     function POOL_FEE_03() external view returns (uint24);
 
     function POOL_FEE_1() external view returns (uint24);
+
+    function POOL_FEE_01() external view returns (uint24);
 }
 
 contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
@@ -58,6 +60,8 @@ contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
     uint24 public constant POOL_FEE_005 = 500;
     // Default seconds ago for the oracle
     uint32 public constant DEFAULT_SECONDS_AGO = 300;
+    // 0.1% pool fee
+    uint24 public constant POOL_FEE_01 = 1000;
 
     function toDecimals(
         uint256 amount,
