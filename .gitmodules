@@ -1,4 +1,0 @@
-[submodule "uni-v3-core"]
-	path = uni-v3-core
-	url = git@github.com:Uniswap/v3-core.git
-	branch = 0.8
