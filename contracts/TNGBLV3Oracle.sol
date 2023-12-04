@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity >=0.7.0 <0.9.0;
 
-import "../uni-v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "./univ3-periphery/OracleLibrary.sol";
-import "./interfaces/ITNGBLV3Oracle.sol";
-import "./abstract/FactoryModifiers.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+import "@openzeppelin/contracts-v0.7/access/Ownable.sol";
 
 /**
  * @title TNGBLV3Oracle
  * @author Veljko Mihailovic
  * @notice Oracle reader contract, adjusted for TNGBL protocol. Uses the same logic as Uniswap V3 oracle example.
  */
-contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
+contract TNGBLV3Oracle is Ownable {
     // ~ Constants ~
 
     // 100% pool fee, used for calculating amountIn for given pool fee
@@ -38,20 +37,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
     /// @dev This event is emitted when the uniswap v3 factory is changed.
     event UniFactoryChanged(address indexed uniV3Factory_new, address indexed uniV3Factory_old);
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    // ~ Initializer ~
-
-    /**
-     * @dev Initializes TNGBLV3Oracle.
-     * @param _factory Address of  Factory contract.
-     * @param _uniV3Factory Address of Uniswap V3 Factory contract.
-     */
-    function initialize(address _factory, address _uniV3Factory) external initializer {
-        __FactoryModifiers_init(_factory);
+    constructor(address _uniV3Factory) Ownable() {
         require(_uniV3Factory != address(0), "ZA 0");
         emit UniFactoryChanged(_uniV3Factory, uniV3Factory);
         uniV3Factory = _uniV3Factory;
@@ -61,7 +47,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
      * @dev Sets new uniswap v3 factory
      * @param _uniV3Factory Address of new uniswap v3 factory.
      */
-    function setUniV3Factory(address _uniV3Factory) external onlyFactoryOwner {
+    function setUniV3Factory(address _uniV3Factory) external onlyOwner {
         require(_uniV3Factory != address(0), "ZA 0");
         emit UniFactoryChanged(_uniV3Factory, uniV3Factory);
         uniV3Factory = _uniV3Factory;
@@ -79,7 +65,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         uint128 amountIn,
         address tokenOut,
         uint32 secondsAgo
-    ) external view override returns (uint256 amountOut) {
+    ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, POOL_FEE_03);
     }
 
@@ -95,7 +81,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         uint128 amountIn,
         address tokenOut,
         uint32 secondsAgo
-    ) external view override returns (uint256 amountOut) {
+    ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, POOL_FEE_001);
     }
 
@@ -111,7 +97,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         uint128 amountIn,
         address tokenOut,
         uint32 secondsAgo
-    ) external view override returns (uint256 amountOut) {
+    ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, POOL_FEE_005);
     }
 
@@ -127,7 +113,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         uint128 amountIn,
         address tokenOut,
         uint32 secondsAgo
-    ) external view override returns (uint256 amountOut) {
+    ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, POOL_FEE_1);
     }
 
@@ -145,7 +131,7 @@ contract TNGBLV3Oracle is ITNGBLV3Oracle, FactoryModifiers {
         address tokenOut,
         uint32 secondsAgo,
         uint24 fee
-    ) external view override returns (uint256 amountOut) {
+    ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, fee);
     }
 

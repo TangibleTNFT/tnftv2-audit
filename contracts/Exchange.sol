@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/IExchange.sol";
 import "./interfaces/ITNGBLV3Oracle.sol";
-import "./univ3-periphery/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 /**
  * @title Exchange

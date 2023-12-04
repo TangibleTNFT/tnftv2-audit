@@ -31,6 +31,8 @@
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
     "@openzeppelin/hardhat-upgrades": "2.3.3",
+    "@uniswap/v3-core": "1.0.1",
+    "@uniswap/v3-periphery": "1.4.4",
     "canonical-weth": "^1.4.0"
   },
   "devDependencies": {
@@ -48,7 +50,7 @@
     "eslint-plugin-prettier": "^5.0.0",
     "eslint-plugin-promise": "^6.1.1",
     "fs": "^0.0.1-security",
-    "hardhat": "^2.16.1",
+    "hardhat": "^2.19.1",
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deploy": "^0.11.44",
     "hardhat-tracer": "^2.7.0",
