@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.7.6;
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
@@ -19,6 +19,8 @@ contract TNGBLV3Oracle is Ownable {
     uint24 public constant POOL_FEE_03 = 3000;
     // 0.01% pool fee
     uint24 public constant POOL_FEE_001 = 100;
+    // 0.0001% pool fee used for rounding errors
+    uint24 public constant POOL_FEE_00001 = 1;
     // 1% pool fee
     uint24 public constant POOL_FEE_1 = 1_0000;
     // 0.05% pool fee

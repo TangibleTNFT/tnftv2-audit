@@ -192,11 +192,11 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
             swapRouter.secondsAgo = DEFAULT_SECONDS_AGO;
         }
         // adjust the amountIn to the fee from pool
-        // adding 0.1% more for slippage, because with just fee
+        // adding 0.00001% more for slippage, because rounding errors
         // I'm getting error too low output amount on exactInputSingle
         amountIn =
             amountIn -
-            ((amountIn * (swapRouter.fee + oracle.POOL_FEE_01())) / oracle.POOL_FEE_100());
+            (amountIn * (swapRouter.fee + oracle.POOL_FEE_00001())  / oracle.POOL_FEE_100());
 
         amountOut = oracle.consultWithFee(
             tokenIn,

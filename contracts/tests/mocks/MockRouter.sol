@@ -54,6 +54,8 @@ contract MockRouter is ISwapRouter, ITNGBLV3Oracle {
     uint24 public constant POOL_FEE_03 = 3000;
     // 0.01% pool fee
     uint24 public constant POOL_FEE_001 = 100;
+    // 0.01% pool fee
+    uint24 public constant POOL_FEE_00001 = 1;
     // 1% pool fee
     uint24 public constant POOL_FEE_1 = 1_0000;
     // 0.05% pool fee

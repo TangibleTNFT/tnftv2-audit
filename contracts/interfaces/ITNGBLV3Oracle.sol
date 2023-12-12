@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity >=0.5.0 <=0.8.21;
+pragma solidity ^0.8.21;
 
 interface ITNGBLV3Oracle {
     // returns the amount out corresponding to the amount in for a given token using the moving average over the time
@@ -42,6 +42,8 @@ interface ITNGBLV3Oracle {
     ) external view returns (uint256);
 
     function POOL_FEE_001() external view returns (uint24);
+
+    function POOL_FEE_00001() external view returns (uint24);
 
     function POOL_FEE_005() external view returns (uint24);
 
