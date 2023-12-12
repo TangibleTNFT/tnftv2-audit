@@ -434,7 +434,7 @@ contract TangibleNFTV2 is
             mapping(uint256 => FeatureInfo) storage featureInfo = tokenFeatureAdded[tokenId];
             require(featureInfo[feature].added, "!exist");
             // if element is the last one, just pop it
-            if (features.length != 1) {
+            if (features.length != 1 && featureInfo[feature].index != (features.length - 1)) {
                 // take last element
                 uint256 last = features[features.length - 1];
                 // set it to index

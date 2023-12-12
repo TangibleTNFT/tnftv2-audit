@@ -339,12 +339,13 @@ contract TNFTMarketplaceV2 is
             require(_years > 0, "YZ");
             _payStorage(nft, IERC20Metadata(_paymentToken), tokenId, _years, _maxStorageAmount);
         }
+        // gas optimization
+        IFactory _factory = IFactory(factory());
         // if initial sale is not done, and whitelitsing is required, check if buyer is whitelisted
         if (
-            IFactory(factory()).onlyWhitelistedForUnmintedCategory(nft) &&
-            !initialSaleCompleted[nft][tokenId]
+            _factory.onlyWhitelistedForUnmintedCategory(nft) && !initialSaleCompleted[nft][tokenId]
         ) {
-            require(IFactory(factory()).whitelistForBuyUnminted(nft, msg.sender), "NW");
+            require(_factory.whitelistForBuyUnminted(nft, msg.sender), "NW");
         }
         //buy the token
         _buy(nft, tokenId, true, _paymentToken, _paymentAmount);
@@ -433,7 +434,7 @@ contract TNFTMarketplaceV2 is
             true
         );
 
-        require(((tokenPrice + tokenizationCost) > 0) && (stock > 0), "!0S");
+        require((tokenPrice + tokenizationCost) > 0 && stock > 0, "!0S");
 
         MintVoucher memory voucher = MintVoucher({
             token: nft,
@@ -515,8 +516,8 @@ contract TNFTMarketplaceV2 is
     ) internal {
         // gas saving
         BuyHelper memory helper = BuyHelper(msg.sender, 0, 0);
-
-        Lot memory _lot = marketplaceLot[address(nft)][tokenId];
+        mapping(uint256 => Lot) storage marketplaceLotForNft = marketplaceLot[address(nft)];
+        Lot storage _lot = marketplaceLotForNft[tokenId];
         require(_lot.seller != address(0), "NLO");
         // if there is a buyer set, only that buyer can buy
         if (_lot.designatedBuyer != address(0)) {
@@ -546,9 +547,9 @@ contract TNFTMarketplaceV2 is
         //take the fee
         helper.toPaySeller = helper.cost;
         uint256 _sellFee = feesPerCategory[nft] == 0 ? DEFAULT_SELL_FEE : feesPerCategory[nft];
-        if ((_sellFee > 0) && chargeFee) {
+        if (_sellFee > 0 && chargeFee) {
             // if there is fee set, decrease amount by the fee and send fee
-            uint256 fee = ((helper.toPaySeller * _sellFee) / 10000);
+            uint256 fee = (helper.toPaySeller * _sellFee) / 100_00;
             helper.toPaySeller = helper.toPaySeller - fee;
             pToken.safeTransferFrom(helper.buyer, sellFeeAddress, fee);
             ISellFeeDistributor(sellFeeAddress).distributeFee(pToken, fee);
@@ -569,12 +570,13 @@ contract TNFTMarketplaceV2 is
 
         emit TnftSold(address(nft), tokenId, address(pToken), _lot.seller, helper.cost);
         emit TnftBought(address(nft), tokenId, address(pToken), helper.buyer, helper.cost);
-        delete marketplaceLot[address(nft)][tokenId];
+        delete marketplaceLotForNft[tokenId];
         //update tracker
         _updateTrackerTnft(nft, tokenId, false);
-
-        if (!initialSaleCompleted[nft][tokenId]) {
-            initialSaleCompleted[nft][tokenId] = true;
+        // gas optimization
+        mapping(uint256 => bool) storage initialSaleCompletedForNft = initialSaleCompleted[nft];
+        if (!initialSaleCompletedForNft[tokenId]) {
+            initialSaleCompletedForNft[tokenId] = true;
         }
 
         nft.safeTransferFrom(address(this), helper.buyer, tokenId);
@@ -595,11 +597,10 @@ contract TNFTMarketplaceV2 is
         uint256 tokenId,
         address designatedBuyer
     ) external {
-        require(
-            msg.sender == marketplaceLot[address(nft)][tokenId].seller || msg.sender == factory(),
-            "NATS"
-        );
-        marketplaceLot[address(nft)][tokenId].designatedBuyer = designatedBuyer;
+        // gas optimization
+        Lot storage _lot = marketplaceLot[address(nft)][tokenId];
+        require(msg.sender == _lot.seller || msg.sender == factory(), "NATS");
+        _lot.designatedBuyer = designatedBuyer;
     }
 
     /**
@@ -639,8 +640,10 @@ contract TNFTMarketplaceV2 is
     ) private returns (bytes4) {
         address nft = msg.sender;
         uint256 price = abi.decode(data, (uint256));
-        IERC20 defUSD = IFactory(factory()).defUSD();
-        require(address(IFactory(factory()).category(ITangibleNFT(nft).name())) == nft, "Not TNFT");
+        // gas optimiz
+        IFactory _factory = IFactory(factory());
+        IERC20 defUSD = _factory.defUSD();
+        require(address(_factory.category(ITangibleNFT(nft).name())) == nft, "Not TNFT");
 
         marketplaceLot[nft][tokenId] = Lot({
             nft: ITangibleNFT(nft),

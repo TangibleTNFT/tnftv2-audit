@@ -166,7 +166,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
      * @return Returns amount that is available to be purchased.
      */
     function availableInStock(uint256 _fingerprint) external view override returns (uint256) {
-        return (goldBars[_fingerprint].weSellAtStock);
+        return goldBars[_fingerprint].weSellAtStock;
     }
 
     /**
@@ -285,15 +285,7 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
      */
     function addGoldBar(uint256 _fingerprint, uint256 _grams) external onlyTangibleLabs {
         require(_grams != 0 && _fingerprint != 0, "Zeros");
-
-        if (goldBars[_fingerprint].grams != 0) {
-            //we update
-            goldBars[_fingerprint].grams = _grams;
-        } else {
-            //we add new
-            GoldBar memory gb = GoldBar({grams: _grams, weSellAtStock: 0});
-            goldBars[_fingerprint] = gb;
-        }
+        goldBars[_fingerprint].grams = _grams;
 
         emit GoldBarAdded(_fingerprint, _grams);
     }
@@ -307,14 +299,11 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
         uint256 _fingerprint,
         uint256 _weSellAtStock
     ) external onlyTangibleLabs {
-        require(goldBars[_fingerprint].grams != 0, "Bar not added");
-        emit GoldBarStockChanged(
-            _fingerprint,
-            goldBars[_fingerprint].weSellAtStock,
-            _weSellAtStock
-        );
+        GoldBar storage gb = goldBars[_fingerprint];
+        require(gb.grams != 0, "Bar not added");
+        emit GoldBarStockChanged(_fingerprint, gb.weSellAtStock, _weSellAtStock);
 
-        goldBars[_fingerprint].weSellAtStock = _weSellAtStock;
+        gb.weSellAtStock = _weSellAtStock;
     }
 
     function marketPriceNativeCurrency(

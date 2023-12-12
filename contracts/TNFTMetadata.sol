@@ -197,11 +197,10 @@ contract TNFTMetadata is FactoryModifiers {
                 delete featureInType[typeItem][featureItem];
                 // remove from typeFeatures
                 uint256 _index = _findElementIntypeFeatures(typeItem, featureItem);
+                uint256[] storage typeFeaturesArray = typeFeatures[typeItem];
                 require(_index != type(uint256).max, "NFD");
-                typeFeatures[typeItem][_index] = typeFeatures[typeItem][
-                    typeFeatures[typeItem].length - 1
-                ];
-                typeFeatures[typeItem].pop();
+                typeFeaturesArray[_index] = typeFeaturesArray[typeFeaturesArray.length - 1];
+                typeFeaturesArray.pop();
                 emit FeatureRemovedFromTnftType(typeItem, featureItem);
 
                 unchecked {
@@ -211,9 +210,12 @@ contract TNFTMetadata is FactoryModifiers {
 
             // remove from array of added
             uint256 index = featureIndexInList[featureItem];
+            uint256 arrLength = featureList.length;
+            if (arrLength != 1 && index != arrLength - 1) {
+                featureList[index] = featureList[arrLength - 1]; // move last to index of removing
+                featureIndexInList[featureList[arrLength - 1]] = index;
+            }
 
-            featureList[index] = featureList[featureList.length - 1]; // move last to index of removing
-            featureIndexInList[featureList[featureList.length - 1]] = index;
             featureList.pop(); // pop last element
             delete featureInfo[featureItem]; // delete from featureInfo mapping
             delete featureIndexInList[featureItem]; // delete from featureIndexInList mapping
@@ -230,9 +232,10 @@ contract TNFTMetadata is FactoryModifiers {
         uint256 _type,
         uint256 _feature
     ) internal view returns (uint256) {
-        uint256 length = typeFeatures[_type].length;
+        uint256[] storage typeFeaturesArray = typeFeatures[_type];
+        uint256 length = typeFeaturesArray.length;
         for (uint256 i; i < length; ) {
-            if (typeFeatures[_type][i] == _feature) return i;
+            if (typeFeaturesArray[i] == _feature) return i;
             unchecked {
                 ++i;
             }
@@ -251,11 +254,12 @@ contract TNFTMetadata is FactoryModifiers {
         string calldata _description,
         bool _paysRent
     ) external onlyFactoryOwner {
-        require(!tnftTypes[_tnftType].added, "already exists");
+        TNFTType storage tnftTypeStored = tnftTypes[_tnftType];
+        require(!tnftTypeStored.added, "already exists");
 
-        tnftTypes[_tnftType].added = true;
-        tnftTypes[_tnftType].description = _description;
-        tnftTypes[_tnftType].paysRent = _paysRent;
+        tnftTypeStored.added = true;
+        tnftTypeStored.description = _description;
+        tnftTypeStored.paysRent = _paysRent;
         tnftTypesArray.push(_tnftType);
 
         emit TnftTypeAdded(_tnftType, _description);
@@ -272,16 +276,17 @@ contract TNFTMetadata is FactoryModifiers {
     ) external onlyFactoryOwner {
         require(tnftTypes[_tnftType].added, "tnftType doesn't exist");
         uint256 length = _features.length;
-
+        uint256[] storage typeFeaturesArray = typeFeatures[_tnftType];
         for (uint256 i; i < length; ) {
             uint256 item = _features[i];
             FeatureInfo storage feature = featureInfo[item];
+            mapping(uint256 => bool) storage featureInTypeArray = featureInType[_tnftType];
             require(feature.added, "feature doesn't exist");
-            require(!featureInType[_tnftType][item], "already added");
+            require(!featureInTypeArray[item], "already added");
 
-            typeFeatures[_tnftType].push(item);
+            typeFeaturesArray.push(item);
             feature.tnftTypes.push(_tnftType);
-            featureInType[_tnftType][item] = true;
+            featureInTypeArray[item] = true;
 
             emit FeatureAddedToTnftType(_tnftType, item);
 

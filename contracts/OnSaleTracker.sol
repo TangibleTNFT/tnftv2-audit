@@ -71,26 +71,30 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
         if (place) {
             //check if something from this category is on sale already
             require(tnft.ownerOf(tokenId) == marketplace, "TM not owner");
-            if (!isTnftOnSale[tnft].selling) {
+            ContractItem storage cItem = isTnftOnSale[tnft];
+            if (!cItem.selling) {
                 //add category to actively selling list
                 tnftCategoriesOnSale.push(tnft);
-                isTnftOnSale[tnft].selling = true;
-                isTnftOnSale[tnft].index = tnftCategoriesOnSale.length - 1;
+                cItem.selling = true;
+                cItem.index = tnftCategoriesOnSale.length - 1;
             }
+            // gas optimization
+            uint256[] storage tokenIdsArray = tnftTokensOnSale[tnft];
             //something is added to marketplace
-
-            tnftTokensOnSale[tnft].push(tokenId);
+            tokenIdsArray.push(tokenId);
             TnftSaleItem memory tsi = TnftSaleItem({
                 tnft: tnft,
                 tokenId: tokenId,
-                indexInCurrentlySelling: tnftTokensOnSale[tnft].length - 1
+                indexInCurrentlySelling: tokenIdsArray.length - 1
             });
             tnftSaleMapper[tnft][tokenId] = tsi;
         } else {
+            //gas optimization
+            mapping(uint256 => TnftSaleItem) storage tnftSaleMap = tnftSaleMapper[tnft];
             //something is removed from marketplace
-            uint256 indexInTokenSale = tnftSaleMapper[tnft][tokenId].indexInCurrentlySelling;
+            uint256 indexInTokenSale = tnftSaleMap[tokenId].indexInCurrentlySelling;
             _removeCurrentlySellingTnft(tnft, indexInTokenSale);
-            delete tnftSaleMapper[tnft][tokenId];
+            delete tnftSaleMap[tokenId];
 
             if (tnftTokensOnSale[tnft].length == 0) {
                 //all tokens are removed, nothing in category is selling anymore
@@ -108,15 +112,16 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
      */
     function _removeCurrentlySellingTnft(ITangibleNFT tnft, uint256 index) internal {
         uint256[] storage tokenIds = tnftTokensOnSale[tnft];
-        require(index < tokenIds.length, "IndexT");
+        uint256 length = tokenIds.length;
+        require(index < length, "IndexT");
         // no need to do anything if it's the last token
         // just pop it
-        if (index == tokenIds.length - 1) {
+        if (index == length - 1) {
             tokenIds.pop();
             return;
         }
         //take last token
-        uint256 tokenId = tokenIds[tokenIds.length - 1];
+        uint256 tokenId = tokenIds[length - 1];
 
         //replace it with the one we are removing
         tokenIds[index] = tokenId;
@@ -130,10 +135,18 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
      * @param index Index of category in the array to remove.
      */
     function _removeCategory(uint256 index) internal {
-        require(index < tnftCategoriesOnSale.length, "IndexC");
+        uint256 length = tnftCategoriesOnSale.length;
+        require(index < length, "IndexC");
+
+        // no need to do anything if it's the last token
+        // just pop it
+        if (index == length - 1) {
+            tnftCategoriesOnSale.pop();
+            return;
+        }
 
         //take last token
-        ITangibleNFT _tnft = tnftCategoriesOnSale[tnftCategoriesOnSale.length - 1];
+        ITangibleNFT _tnft = tnftCategoriesOnSale[length - 1];
 
         //replace it with the one we are removing
         tnftCategoriesOnSale[index] = _tnft;
@@ -163,7 +176,7 @@ contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
         result = new TokenArray[](length);
 
         for (uint256 i; i < length; ) {
-            TokenArray memory temp = TokenArray(tnftTokensOnSale[tnfts[i]]);
+            TokenArray memory temp = TokenArray({tokenIds: tnftTokensOnSale[tnfts[i]]});
             result[i] = temp;
 
             unchecked {
