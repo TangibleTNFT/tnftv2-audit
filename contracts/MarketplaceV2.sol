@@ -530,8 +530,8 @@ contract TNFTMarketplaceV2 is
         helper.cost = _lot.price;
         //protection from over charging
         require(helper.cost <= _price && address(pToken) == _paymentToken, "OC");
-        uint256 tokenizationCost;
         if (helper.cost == 0) {
+            uint256 tokenizationCost;
             (helper.cost, , tokenizationCost) = _itemPrice(
                 nft,
                 IERC20Metadata(address(pToken)),
@@ -539,7 +539,6 @@ contract TNFTMarketplaceV2 is
                 false
             );
             helper.cost += tokenizationCost;
-            tokenizationCost = 0;
         }
 
         require(helper.cost != 0, "Price0");
