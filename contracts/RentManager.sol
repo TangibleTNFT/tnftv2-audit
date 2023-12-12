@@ -58,17 +58,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     // @notice Used to store the address that will be notified when rent is deposited for a token.
     address public notificationDispatcher;
 
-    address public ustb;
-
     // ~ Events ~
-
-    /**
-     * @dev Emitted when ustb contract is updated.
-     *
-     * @param newUSTB The address of the new ustb.
-     * @param oldUSTB The address of the old ustb.
-     */
-    event USTBUpdated(address indexed newUSTB, address indexed oldUSTB);
 
     /**
      * @dev Emitted when rent is deposited for a token.
@@ -148,19 +138,11 @@ contract RentManager is IRentManager, FactoryModifiers {
      * @dev Constructor that initializes the TNFT contract address.
      * @param _tnftAddress The address of the TNFT contract.
      */
-    function initialize(
-        address _tnftAddress,
-        address _factory,
-        address _ustb
-    ) external initializer {
-        require(_tnftAddress != address(0) && _ustb != address(0), "zero address");
+    function initialize(address _tnftAddress, address _factory) external initializer {
+        require(_tnftAddress != address(0), "zero address");
         __FactoryModifiers_init(_factory);
         TNFT_ADDRESS = _tnftAddress;
         depositor = IFactory(_factory).categoryOwner(ITangibleNFT(_tnftAddress));
-        ustb = _ustb;
-        //opt out from rebasing
-        IUSTB(_ustb).disableRebase(address(this), true);
-        emit USTBUpdated(_ustb, address(0));
     }
 
     // ~ Functions ~
@@ -178,14 +160,16 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Function to update the address of the ustb token.
-     * @param _ustb The address of the new ustb.
+     * @dev Function to disable rebasing of tngbl foundation tokens.
+     * @param _token The address of the rebasing token.
+     * @param _disable True if we want to disable rebase, false if we want to enable it.
      */
-    function updateUSTB(address _ustb) external onlyCategoryOwner(ITangibleNFT(TNFT_ADDRESS)) {
-        require(_ustb != address(0), "USTB address cannot be 0");
-        emit USTBUpdated(_ustb, ustb);
-        ustb = _ustb;
-        IUSTB(_ustb).disableRebase(address(this), true);
+    function disableRebaseOfRentToken(
+        address _token,
+        bool _disable
+    ) external onlyCategoryOwner(ITangibleNFT(TNFT_ADDRESS)) {
+        require(_token != address(0), "Token address cannot be 0");
+        IUSTB(_token).disableRebase(address(this), _disable);
     }
 
     /**
