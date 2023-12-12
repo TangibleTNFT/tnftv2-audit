@@ -196,7 +196,7 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         // I'm getting error too low output amount on exactInputSingle
         amountIn =
             amountIn -
-            (amountIn * (swapRouter.fee + oracle.POOL_FEE_00001())  / oracle.POOL_FEE_100());
+            ((amountIn * (swapRouter.fee + oracle.POOL_FEE_00001())) / oracle.POOL_FEE_100());
 
         amountOut = oracle.consultWithFee(
             tokenIn,
