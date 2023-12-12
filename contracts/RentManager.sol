@@ -5,6 +5,7 @@ import "./interfaces/IRentManager.sol";
 import "./interfaces/IRentNotificationDispatcher.sol";
 
 import "./interfaces/ITangibleNFT.sol";
+import "./interfaces/IUSTB.sol";
 
 import "./abstract/FactoryModifiers.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -57,7 +58,17 @@ contract RentManager is IRentManager, FactoryModifiers {
     // @notice Used to store the address that will be notified when rent is deposited for a token.
     address public notificationDispatcher;
 
+    address public ustb;
+
     // ~ Events ~
+
+    /**
+     * @dev Emitted when ustb contract is updated.
+     *
+     * @param newUSTB The address of the new ustb.
+     * @param oldUSTB The address of the old ustb.
+     */
+    event USTBUpdated(address indexed newUSTB, address indexed oldUSTB);
 
     /**
      * @dev Emitted when rent is deposited for a token.
@@ -137,11 +148,19 @@ contract RentManager is IRentManager, FactoryModifiers {
      * @dev Constructor that initializes the TNFT contract address.
      * @param _tnftAddress The address of the TNFT contract.
      */
-    function initialize(address _tnftAddress, address _factory) external initializer {
-        require(_tnftAddress != address(0), "TNFT address cannot be 0");
+    function initialize(
+        address _tnftAddress,
+        address _factory,
+        address _ustb
+    ) external initializer {
+        require(_tnftAddress != address(0) && _ustb != address(0), "zero address");
         __FactoryModifiers_init(_factory);
         TNFT_ADDRESS = _tnftAddress;
         depositor = IFactory(_factory).categoryOwner(ITangibleNFT(_tnftAddress));
+        ustb = _ustb;
+        //opt out from rebasing
+        IUSTB(_ustb).disableRebase(address(this), true);
+        emit USTBUpdated(_ustb, address(0));
     }
 
     // ~ Functions ~
@@ -156,6 +175,17 @@ contract RentManager is IRentManager, FactoryModifiers {
     ) external onlyCategoryOwner(ITangibleNFT(TNFT_ADDRESS)) {
         require(_newDepositor != address(0), "Depositor address cannot be 0");
         depositor = _newDepositor;
+    }
+
+    /**
+     * @dev Function to update the address of the ustb token.
+     * @param _ustb The address of the new ustb.
+     */
+    function updateUSTB(address _ustb) external onlyCategoryOwner(ITangibleNFT(TNFT_ADDRESS)) {
+        require(_ustb != address(0), "USTB address cannot be 0");
+        emit USTBUpdated(_ustb, ustb);
+        ustb = _ustb;
+        IUSTB(_ustb).disableRebase(address(this), true);
     }
 
     /**
