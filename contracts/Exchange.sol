@@ -35,6 +35,8 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
     /// @notice UniV3 oracle.
     ITNGBLV3Oracle public oracle;
 
+    uint256 public percentageDeviation;
+
     // ~ Events ~
 
     /**
@@ -43,6 +45,15 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
      * @param oracle_old Old oracle address.
      */
     event OracleChanged(address indexed oracle_new, address indexed oracle_old);
+
+    /**
+     *
+     * @param percentageDeviation_new New percentage deviation.
+     * @param percentageDeviation_old Old percentage deviation.
+     */
+    event PercentageDeviationChanged(
+        uint256 indexed percentageDeviation_new,
+        uint256 indexed percentageDeviation_old);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -60,6 +71,7 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         require(_oracle != address(0), "ZA 0");
         emit OracleChanged(_oracle, address(oracle));
         oracle = ITNGBLV3Oracle(_oracle);
+        percentageDeviation = ITNGBLV3Oracle(_oracle).POOL_FEE_001();
     }
 
     // ~ External Funcions ~
@@ -101,6 +113,16 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         });
         routers[tokenized] = swapRouter;
         routers[tokenizedReverse] = swapRouter;
+    }
+
+    /**
+     * @notice This function allows the factory owner to change the percentage deviation.
+     * @param _percentageDeviation Percentage deviation used on the oracle.
+     */
+    function setPercentageDeviation(uint256 _percentageDeviation) external onlyFactoryOwner {
+        require(_percentageDeviation <= ITNGBLV3Oracle(oracle).POOL_FEE_01(), "To high");
+        emit PercentageDeviationChanged(_percentageDeviation, percentageDeviation);
+        percentageDeviation = _percentageDeviation;
     }
 
     /**
@@ -196,7 +218,7 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
         // I'm getting error too low output amount on exactInputSingle
         amountIn =
             amountIn -
-            ((amountIn * (swapRouter.fee + oracle.POOL_FEE_00001())) / oracle.POOL_FEE_100());
+            ((amountIn * (swapRouter.fee + percentageDeviation)) / oracle.POOL_FEE_100());
 
         amountOut = oracle.consultWithFee(
             tokenIn,

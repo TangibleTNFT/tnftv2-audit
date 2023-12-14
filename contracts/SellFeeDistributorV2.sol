@@ -45,7 +45,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     event FeeDistributed(address indexed to, uint256 usdcAmount);
 
     /// @notice This event is emitted when RWA_TOKEN tokens are burned.
-    event TangibleBurned(uint256 burnedTngbl);
+    event RWABurned(uint256 burnedTngbl);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -157,42 +157,43 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      *      to the `revenueShare` contract. The rest will be exchanged for RWA_TOKEN tokens and burned.
      */
     function _distributeFee(IERC20 _paymentToken, uint256 _feeAmount) internal {
+        // exchange payment token for REVENUE_TOKEN
+        if (address(_paymentToken) != address(REVENUE_TOKEN)) {
+            //we need to convert the payment token to REVENUE_TOKEN
+            _paymentToken.approve(address(exchange), _feeAmount);
+            _feeAmount = exchange.exchange(
+                address(_paymentToken),
+                address(REVENUE_TOKEN),
+                _feeAmount,
+                exchange.quoteOut(address(_paymentToken), address(REVENUE_TOKEN), _feeAmount)
+            );
+        }
         //take 66.6666% and send to revenueShare
         uint256 amountForRevenue = (_feeAmount * revenuePercent) / FULL_PORTION;
         uint256 amountForBurn = _feeAmount - amountForRevenue;
-        if (address(_paymentToken) != address(REVENUE_TOKEN)) {
-            //we need to convert the payment token to usdc
-            _paymentToken.approve(address(exchange), amountForRevenue);
-            amountForRevenue = exchange.exchange(
-                address(_paymentToken),
-                address(REVENUE_TOKEN),
-                amountForRevenue,
-                exchange.quoteOut(address(_paymentToken), address(REVENUE_TOKEN), amountForRevenue)
-            );
-        }
         REVENUE_TOKEN.safeTransfer(revenueShare, amountForRevenue);
         emit FeeDistributed(revenueShare, amountForRevenue);
 
-        //convert 33.334% to tngbl and burn it
-        // exchange usdc for tngbl
-        _paymentToken.approve(address(exchange), amountForBurn);
-        uint256 tngblToBurn = exchange.exchange(
-            address(_paymentToken),
+        //convert 33.334% to rwa and burn it
+        // exchange usdc for rwa
+        REVENUE_TOKEN.approve(address(exchange), amountForBurn);
+        uint256 rwaToBurn = exchange.exchange(
+            address(REVENUE_TOKEN),
             address(RWA_TOKEN),
             amountForBurn,
             exchange.quoteOut(address(_paymentToken), address(RWA_TOKEN), amountForBurn)
         );
 
         if (isMainnet) {
-            //burn the tngbl
-            RWA_TOKEN.approve(address(this), tngblToBurn);
-            ERC20Burnable(address(RWA_TOKEN)).burn(tngblToBurn);
+            //burn the rwa
+            RWA_TOKEN.approve(address(this), rwaToBurn);
+            ERC20Burnable(address(RWA_TOKEN)).burn(rwaToBurn);
 
-            emit TangibleBurned(tngblToBurn);
+            emit RWABurned(rwaToBurn);
         } else {
             //send to dead address
-            RWA_TOKEN.safeTransfer(0xdeaDDeADDEaDdeaDdEAddEADDEAdDeadDEADDEaD, tngblToBurn);
-            emit TangibleBurned(tngblToBurn);
+            RWA_TOKEN.safeTransfer(0xdeaDDeADDEaDdeaDdEAddEADDEAdDeadDEADDEaD, rwaToBurn);
+            emit RWABurned(rwaToBurn);
         }
     }
 }

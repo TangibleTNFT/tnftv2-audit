@@ -212,6 +212,13 @@ describe.only("TNFT Ecosystem", () => {
             3000,
             0
         );
+        tx = await exchange.addFeesTokens(
+            usdc.target,
+            tngbl.target,
+            mockrouter.target,
+            3000,
+            0
+        );
 
         //deploy SellFeeDistributor
         const SellFeeDistributor = await ethers.getContractFactory("SellFeeDistributorV2");
