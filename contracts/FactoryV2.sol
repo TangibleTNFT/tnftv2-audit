@@ -699,6 +699,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         ITangibleNFT tnft,
         uint256 numDays
     ) external onlyCategoryOwner(tnft) {
+        require(numDays >= 30, "Min days 30");
         daysBeforeSeize[tnft] = numDays;
     }
 

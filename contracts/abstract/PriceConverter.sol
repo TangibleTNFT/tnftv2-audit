@@ -9,7 +9,7 @@ abstract contract PriceConverter {
         uint8 fromDecimal,
         uint8 toDecimal
     ) internal pure returns (uint256) {
-        require(toDecimal >= uint8(0) && toDecimal <= uint8(18), "Invalid _decimals");
+        require(toDecimal <= 18, "Invalid _decimals");
         uint256 diff;
         if (fromDecimal > toDecimal) {
             unchecked {

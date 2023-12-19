@@ -14,17 +14,17 @@ contract TNGBLV3Oracle is Ownable {
     // ~ Constants ~
 
     // 100% pool fee, used for calculating amountIn for given pool fee
-    uint24 public constant POOL_FEE_100 = 100_0000;
+    uint24 public constant POOL_FEE_100 = 100e4;
     // 0.3% pool fee
-    uint24 public constant POOL_FEE_03 = 3000;
+    uint24 public constant POOL_FEE_03 = 0.3e4;
     // 0.01% pool fee
-    uint24 public constant POOL_FEE_001 = 100;
+    uint24 public constant POOL_FEE_001 = 0.01e4;
     // 0.0001% pool fee used for rounding errors
-    uint24 public constant POOL_FEE_00001 = 1;
+    uint24 public constant POOL_FEE_00001 = 0.0001e4;
     // 1% pool fee
-    uint24 public constant POOL_FEE_1 = 1_0000;
+    uint24 public constant POOL_FEE_1 = 1e4;
     // 0.05% pool fee
-    uint24 public constant POOL_FEE_005 = 500;
+    uint24 public constant POOL_FEE_005 = 0.05e4;
     // Default seconds ago for the oracle
     uint32 public constant DEFAULT_SECONDS_AGO = 300;
     // ~ State Variables ~
@@ -33,7 +33,7 @@ contract TNGBLV3Oracle is Ownable {
     address public uniV3Factory;
 
     // 0.1% pool fee
-    uint24 public constant POOL_FEE_01 = 1000;
+    uint24 public constant POOL_FEE_01 = 0.1e4;
     // ~ Events ~
 
     /// @dev This event is emitted when the uniswap v3 factory is changed.

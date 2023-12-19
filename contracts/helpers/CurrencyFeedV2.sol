@@ -7,8 +7,10 @@ import "../abstract/FactoryModifiers.sol";
 /**
  * @title CurrencyFeedV2
  * @author Veljko Mihailovic
- * @notice This smart contract is used to store ISO codes for countries/currencies and manages price feed oracles for each currency supported.
- * @dev This contract utilizes the International Organization for Standardization (ISO)'s standard for representing global currencies and countries.
+ * @notice This smart contract is used to store ISO codes(Numbers converted to integer eg 001-> 1, for contract simplicity)
+ *  for countries/currencies and manages price feed oracles for each currency supported.
+ * @dev This contract utilizes the International Organization for Standardization (ISO)'s standard
+ *  for representing global currencies and countries.
  *      country codes: https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
  *      currency codes: https://en.wikipedia.org/wiki/ISO_4217
  */
@@ -21,26 +23,26 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
     /// @notice A premium taken by Tangible. It's tacked on top of the existing exchange rate of 2 currencies. This one is stored using the ISO alpha code for the key.
     mapping(string => uint256) public conversionPremiums;
 
-    /// @notice This mapping is used to store a price feed oracle for a specific currency ISO numeric code.
+    /// @notice This mapping is used to store a price feed oracle for a specific currency ISO numeric code converted to integer.
     mapping(uint16 => AggregatorV3Interface) public currencyPriceFeedsISONum;
 
-    /// @notice A premium taken by Tangible. It's tacked on top of the existing exchange rate of 2 currencies. This one is stored using the ISO numeric code for the key.
+    /// @notice A premium taken by Tangible. It's tacked on top of the existing exchange rate of 2 currencies. This one is stored using the ISO numeric code converted to integer for the key.
     mapping(uint16 => uint256) public conversionPremiumsISONum;
 
     /// @notice Used to store ISO curency numeric code using it's alpha code as reference.
-    /// @dev i.e. ISOCurrencyCodeToNum["AUD"] = 036
+    /// @dev i.e. ISOCurrencyCodeToNum["AUD"] = 36
     mapping(string => uint16) public ISOcurrencyCodeToNum;
 
     /// @notice Used to store ISO curency alpha code using it's numeric code as reference.
-    /// @dev i.e. ISOcurrencyNumToCode[036] = "AUD"
+    /// @dev i.e. ISOcurrencyNumToCode[36] = "AUD"
     mapping(uint16 => string) public ISOcurrencyNumToCode;
 
     /// @notice Used to store ISO country numeric code using it's alpha code as reference.
-    /// @dev i.e. ISOcountryCodeToNum["AUS"] = 036
+    /// @dev i.e. ISOcountryCodeToNum["AUS"] = 36
     mapping(string => uint16) public ISOcountryCodeToNum;
 
     /// @notice Used to store ISO curency alpha code using it's numeric code as reference.
-    /// @dev i.e. ISOcountryNumToCode[036] = "AUS"
+    /// @dev i.e. ISOcountryNumToCode[36] = "AUS"
     mapping(uint16 => string) public ISOcountryNumToCode;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -55,7 +57,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
     /**
      * @notice This method is used to update the state of `ISOcurrencyCodeToNum` and `ISOcurrencyNumToCode`.
      * @param _currency ISO-4217 alpha code. @dev I.e. if currency is Australian dollar, this value would be "AUD".
-     * @param _currencyISONum ISO-4217 numeric code. @dev I.e. if currency is Australian dollar, this value would be `036`).
+     * @param _currencyISONum ISO-4217 numeric code converted to integer. @dev I.e. if currency is Australian dollar, this value would be `36`).
      */
     function setISOCurrencyData(
         string memory _currency,
@@ -68,7 +70,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
     /**
      * @notice This method is used to update the state of `ISOcountryCodeToNum` and `ISOcountryNumToCode`.
      * @param _country ISO-3166 alpha code. @dev I.e. if country is Australia, this value would be "AUS".
-     * @param _countryISONum ISO-3166 numeric code. @dev I.e. if country is Australia, this value would be `036`.
+     * @param _countryISONum ISO-3166 numeric code converted to integer. @dev I.e. if country is Australia, this value would be `36`.
      */
     function setISOCountryData(
         string memory _country,

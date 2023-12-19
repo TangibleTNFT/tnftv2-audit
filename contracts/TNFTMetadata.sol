@@ -142,8 +142,7 @@ contract TNFTMetadata is FactoryModifiers {
             feature.description = _featureDescriptions[i]; // set description
             featureList.push(item); // add to featureList
 
-            featureIndexInList[item] = featureListLength; // update mapping for removing
-            featureListLength++;
+            featureIndexInList[item] = featureListLength + i; // update mapping for removing
 
             emit FeatureAdded(item, _featureDescriptions[i]);
 

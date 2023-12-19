@@ -194,7 +194,7 @@ contract TangibleNFTV2 is
 
         storagePriceFixed = _storagePriceFixed;
         storagePricePerYear = 20_00; // 20$ in 2 decimals
-        storagePercentagePricePerYear = 10; // 0.1 percent
+        storagePercentagePricePerYear = 0.1e2; // 0.1 percent
         storageRequired = _storageRequired;
         symbolInUri = _symbolInUri;
 
@@ -427,16 +427,19 @@ contract TangibleNFTV2 is
         uint256[] calldata _features
     ) external onlyCategoryOwner(ITangibleNFT(address(this))) {
         uint256 length = _features.length;
+        uint256[] storage features = tokenFeatures[tokenId];
+        mapping(uint256 => FeatureInfo) storage featureInfo = tokenFeatureAdded[tokenId];
 
         for (uint256 i; i < length; ) {
             uint256 feature = _features[i];
-            uint256[] storage features = tokenFeatures[tokenId];
-            mapping(uint256 => FeatureInfo) storage featureInfo = tokenFeatureAdded[tokenId];
             require(featureInfo[feature].added, "!exist");
+
+            uint256 lastIndex = features.length - 1;
+            uint256 index = featureInfo[feature].index;
             // if element is the last one, just pop it
-            if (features.length != 1 && featureInfo[feature].index != (features.length - 1)) {
+            if (index != lastIndex) {
                 // take last element
-                uint256 last = features[features.length - 1];
+                uint256 last = features[lastIndex];
                 // set it to index
                 features[featureInfo[feature].index] = last;
                 // update index of the last
@@ -445,7 +448,7 @@ contract TangibleNFTV2 is
             //remove from array
             features.pop();
             // delete mapping and
-            delete tokenFeatureAdded[tokenId][feature];
+            delete featureInfo[feature];
             emit TnftFeature(tokenId, feature, false);
 
             unchecked {
@@ -692,11 +695,9 @@ contract TangibleNFTV2 is
      * @return If true, storage has not expired, otherwise false.
      */
     function _isStorageFeePaid(uint256 tokenId) internal view returns (bool) {
-        //logic for no storage
-        if (!_shouldPayStorage()) {
-            return true;
-        }
-        return storageEndTime[tokenId] > block.timestamp;
+        // if you shouldn't pay storage, return true or if storage end time is in the future
+        return !_shouldPayStorage() || storageEndTime[tokenId] > block.timestamp;
+
     }
 
     function _shouldPayStorage() internal view returns (bool) {

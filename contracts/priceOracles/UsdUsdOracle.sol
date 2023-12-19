@@ -8,7 +8,7 @@ pragma solidity 0.8.21;
  */
 contract Owned {
     address public owner;
-    address private pendingOwner;
+    address private _pendingOwner;
 
     event OwnershipTransferRequested(address indexed from, address indexed to);
     event OwnershipTransferred(address indexed from, address indexed to);
@@ -22,20 +22,20 @@ contract Owned {
      * pending.
      */
     function transferOwnership(address _to) external onlyOwner {
-        pendingOwner = _to;
+        _pendingOwner = _to;
 
-        emit OwnershipTransferRequested(owner, _to);
+        emit OwnershipTransferRequested(msg.sender, _to);
     }
 
     /**
      * @dev Allows an ownership transfer to be completed by the recipient.
      */
     function acceptOwnership() external {
-        require(msg.sender == pendingOwner, "Must be proposed owner");
+        require(msg.sender == _pendingOwner, "Must be proposed owner");
 
         address oldOwner = owner;
         owner = msg.sender;
-        pendingOwner = address(0);
+        _pendingOwner = address(0);
 
         emit OwnershipTransferred(oldOwner, msg.sender);
     }
@@ -111,13 +111,18 @@ interface AggregatorV2V3Interface is AggregatorInterface, AggregatorV3Interface 
  * aggregated answers and round information.
  */
 contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
+
+    int256 private constant ONE_INT256 = 1;
+    uint80 private constant ONE_UINT80 = 1;
+    uint256 private constant ONE_UINT256 = 1;
+    uint8 private constant ZERO_UINT8 = 1;
     /**
      * We simply return 1 for the latest answer, to support
      * our flow in oracles when we do conversions from some other
      * currencies to USD. In case the currency is indeed USD, we just multiply with 1.
      */
     function latestAnswer() public view override returns (int256) {
-        return 1;
+        return ONE_INT256;
     }
 
     /**
@@ -154,14 +159,14 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
             uint80 answeredInRound
         )
     {
-        return (1, latestAnswer(), block.timestamp, block.timestamp, 1);
+        return (ONE_UINT80, latestAnswer(), block.timestamp, block.timestamp, ONE_UINT80);
     }
 
     /**
      * @notice represents the number of decimals the aggregator responses represent.
      */
     function decimals() external view override returns (uint8) {
-        return 0;
+        return ZERO_UINT8;
     }
 
     /**
@@ -169,7 +174,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
      * points to.
      */
     function version() external view override returns (uint256) {
-        return 1;
+        return ONE_UINT256;
     }
 
     /**
@@ -180,7 +185,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     }
 
     function getAnswer(uint256 roundId) external view override returns (int256) {
-        return 1;
+        return ONE_INT256;
     }
 
     function getTimestamp(uint256 roundId) external view override returns (uint256) {
@@ -188,7 +193,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     }
 
     function latestRound() external view override returns (uint256) {
-        return 1;
+        return ONE_UINT256;
     }
 
     function latestTimestamp() external view override returns (uint256) {
@@ -209,6 +214,6 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
             uint80 answeredInRound
         )
     {
-        return (1, latestAnswer(), block.timestamp, block.timestamp, 1);
+        return (ONE_UINT80, latestAnswer(), block.timestamp, block.timestamp, ONE_UINT80);
     }
 }

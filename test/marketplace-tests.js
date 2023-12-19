@@ -222,7 +222,7 @@ describe.only("TNFT Ecosystem", () => {
 
         //deploy SellFeeDistributor
         const SellFeeDistributor = await ethers.getContractFactory("SellFeeDistributorV2");
-        sellFeeDistributor = await upgrades.deployProxy(SellFeeDistributor, [factoryContract.target, mockRevenueShare.target, usdc.target, tngbl.target, false]);
+        sellFeeDistributor = await upgrades.deployProxy(SellFeeDistributor, [factoryContract.target, mockRevenueShare.target, usdc.target]);
         await sellFeeDistributor.waitForDeployment();
         await sellFeeDistributor.setExchange(exchange.target);
 
@@ -1101,7 +1101,7 @@ describe.only("TNFT Ecosystem", () => {
             expect(paidPriceEvent).eq(lot[0].price)
             expect(beforeSaleBuyerBalance - afterSaleBuyerBalance).equal(80000000000000n + 5722832889n ); //price and storage
             expect(afterSaleVendorBalance - beforeSaleVendorBalance).equal(80000000000000n - 2000000000000n  + 5722832889n); // price - fee + storage
-            expect(feeBalance).equal(1333333333n); // this is the rev fee that is taken rest is burned in tngbl
+            expect(feeBalance).equal(2000000000n); // this is the rev fee that is taken 
             expect(tokenOwner).equal(randomUser.address);
             
         })
