@@ -115,7 +115,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     int256 private constant ONE_INT256 = 1;
     uint80 private constant ONE_UINT80 = 1;
     uint256 private constant ONE_UINT256 = 1;
-    uint8 private constant ZERO_UINT8 = 1;
+    uint8 private constant ZERO_UINT8 = 0;
     /**
      * We simply return 1 for the latest answer, to support
      * our flow in oracles when we do conversions from some other
