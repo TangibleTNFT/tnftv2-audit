@@ -1,10 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./FactoryModifiers.sol";
 import "../interfaces/ITangibleNFT.sol";
 import "../interfaces/INotificationWhitelister.sol";
 
+/**
+ * @title NotificationWhitelister
+ * @author Veljko Mihailovic
+ * @notice Meant to be inherited by implementation contracts for specific Notifications
+ * @dev This contract is keep track of couple of things:
+ * - Which addresses are whitelisted to register for notification
+ * - Which addresses are approved to whitelist other addresses
+ * - Which addresses are registered for notification for specific tnft token
+ * It is used to pass notification to the registered addresses.
+ * The flow is separated in couple of steps:
+ * - We need to approve address that can whitelist other addresses for notification
+ * - We need to whitelist address that can register itself for notification
+ * - And finally, whitelisted address, can register for notifications regarding specific token
+ */
 abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhitelister {
     /// @custom:storage-location erc7201:tangible.storage.NotificationWhitelister
     struct NotificationWhitelisterStorage {
@@ -35,11 +49,20 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
         }
     }
 
+    /**
+     * @notice This modifier is used to check if the caller is approved whitelister
+     */
     modifier onlyApprovedWhitelister() {
         _checkApprover();
         _;
     }
 
+    /**
+     * @notice This is init function for NotificationWhitelister contract, to be
+     * used by inheritor.
+     * @param _factory Address of the factory contract
+     * @param _tnft Address of the tnft contract for which it handles notifications
+     */
     function __NotificationWhitelister_init(
         address _factory,
         address _tnft
@@ -52,11 +75,19 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
 
     // ~ View function and setters, so that contract can be upgradeable
 
+    /**
+     * @notice Returns the tnft address for which it handles notifications
+     */
     function tnft() public view virtual returns (ITangibleNFT) {
         NotificationWhitelisterStorage storage $ = _getNotificationWhitelisterStorage();
         return $.tnft;
     }
 
+    /**
+     * @notice Returns the address that is registered for notification for specific tnft token
+     * @param _tnft Address of the tnft contract for which it handles notifications
+     * @param _tokenId TokenId for which the address will be registered for notification
+     */
     function registeredForNotification(
         address _tnft,
         uint256 _tokenId
@@ -65,11 +96,19 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
         return $.registeredForNotification[_tnft][_tokenId];
     }
 
+    /**
+     * @notice Returns the address that is whitelisted that can register for notification
+     * @param _receiver The address to check if it is whitelisted
+     */
     function whitelistedReceiver(address _receiver) public view virtual returns (bool) {
         NotificationWhitelisterStorage storage $ = _getNotificationWhitelisterStorage();
         return $.whitelistedReceiver[_receiver];
     }
 
+    /**
+     * @notice Returns the address that is approved whitelister
+     * @param _whitelister The address to check if it is approved whitelister
+     */
     function approvedWhitelisters(address _whitelister) public view virtual returns (bool) {
         NotificationWhitelisterStorage storage $ = _getNotificationWhitelisterStorage();
         return $.approvedWhitelisters[_whitelister];
@@ -78,7 +117,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     // ~ Functions ~
 
     /**
-     * @notice adds an address that can whitelist others, only callable by the category owner
+     * @notice adds an address that can whitelist others,
+     * @dev only callable by the category owner
      *
      * @param _whitelister Address that can whitelist other addresses besides category owner
      */
@@ -88,7 +128,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     * @notice removes an address that can whitelist others, only callable by the category owner
+     * @notice removes an address that can whitelist others,
+     * @dev only callable by the category owner
      *
      * @param _whitelister Address that can whitelist other addresses besides category owner
      */
@@ -100,7 +141,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     *
+     * @notice Adds an address that will be whitelisted so that it
+     *  register for notification
      * @param receiver Address that will be whitelisted
      */
     function whitelistAddressAndReceiver(address receiver) external onlyApprovedWhitelister {
@@ -110,7 +152,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     *
+     * @notice Removes an address and that address can't register for notification
+     * anymore
      * @param receiver Address that will be blacklisted
      */
     function blacklistAddress(address receiver) external onlyApprovedWhitelister {
@@ -120,7 +163,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     * @notice Registers or unregisters an address for notification, only callable by the category owner
+     * @notice Registers or unregisters an address for notification,
+     * @dev only callable by the category owner
      *
      * @param tokenId TokenId for which the address will be registered for notification
      * @param receiver Address that will be registered for notification
@@ -140,7 +184,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     *
+     *  @notice Whitelisted address calls this to registed for notification
+     * for specific token id
      * @param tokenId TokenId for which the address will be registered for notification
      */
     function registerForNotification(uint256 tokenId) external {
@@ -151,7 +196,8 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
     }
 
     /**
-     *
+     * @notice Whitelisted address is unregistering from notifications
+     * for specific token id
      * @param tokenId TokenId for which the address will be unregistered for notification
      */
     function unregisterForNotification(uint256 tokenId) external {
@@ -163,7 +209,6 @@ abstract contract NotificationWhitelister is FactoryModifiers, INotificationWhit
 
     /**
      * @notice Checks if the address is approved whitelister
-     *
      */
     function _checkApprover() internal view {
         NotificationWhitelisterStorage storage $ = _getNotificationWhitelisterStorage();

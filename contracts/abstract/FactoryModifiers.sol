@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "../interfaces/IFactory.sol";
 import "../interfaces/IOwnable.sol";
@@ -10,7 +10,24 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 /**
  * @title FactoryModifiers
  * @author Veljko Mihailovic
- * @notice This contract offers permissioned modifiers for contracts that have factory permissioned functions.
+ * @notice This contract offers permissioned modifiers for contracts that have factory.
+ * @dev The whole TNFT marketplace contracts system is revolving around the Factory and through it,
+ * then management and maintenance system. Every contract in the ecosystem inherits this contract
+ * and thus has the same ownership. The reason behind this is that we have couple
+ * of factories that spawn contracts. The protocol is designed to be dynamic, to support various
+ * vendors comming and offering their RWA products on our marketplace.
+ * With this contract, we enable proper access management and that all contracts have the latest factory.
+ * Being a protocol, we have a couple of different roles that any vendor must oblige and has
+ * its own responsibilities. The roles are:
+ * - Factory owner: The owner of the factory is the one that deployed the factory contract.
+ * - Factory: The factory is the contract that spawns other contracts, is proxy for others etc. Since it is
+ *  being a proxy for others, means that only Factory contract can make state changes on various places
+ * - Category owner: The owner of the category is the one that deployed the category contract. Vendor.
+ * - Fingerprint approver: The fingerprint approver is the one that approves the fingerprints of the NFT.
+ *   Address should be a multisig that is not controlled by the vendor, a 3rd party that will verify that
+ *  the NFT is not a copy of some other NFT.products they want to bring to marketplace are ok.
+ * - Tangible Labs: The Tangible Labs is the multisig that is controlled by the Tangible Labs team.
+ *
  */
 abstract contract FactoryModifiers is Initializable, ContextUpgradeable {
     /// @custom:storage-location erc7201:tangible.storage.FactoryModifiers

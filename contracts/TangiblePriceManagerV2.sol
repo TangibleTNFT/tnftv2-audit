@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/ITangiblePriceManager.sol";
 import "./abstract/FactoryModifiers.sol";
 
 /**
- * @title TangiblePriceManager
+ * @title TangiblePriceManagerV2
  * @author Veljko Mihailovic
  * @notice This contract is used to facilitate the fetching/response of TangibleNFT prices
+ * @dev This contract is used to fetch proper oracles for each TangibleNFT category.
  */
 contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
     // ~ State Variables ~
@@ -35,6 +36,7 @@ contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
 
     /**
      * @notice The function is used to set oracle contracts in the `oracleForCategory` mapping.
+     * @dev Each TangibleNFT category(contract) has it's own oracle contract.
      * @param category TangibleNFT contract.
      * @param oracle PriceOracle contract.
      */
@@ -50,7 +52,8 @@ contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
     }
 
     /**
-     * @notice This function fetches pricing data for an array of products.
+     * @notice This function fetches pricing data for an array of products, from fingerprints
+     * @dev Price is indicated in USD $ in paymentUSDToken decimals.
      * @param nft TangibleNFT contract reference.
      * @param paymentUSDToken Token being used as payment.
      * @param fingerprints Array of token fingerprints data.
@@ -82,7 +85,8 @@ contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
 
     /**
      *
-     * @notice This function fetches pricing data for specific product.
+     * @notice This function fetches pricing data for specific product, from fingerprint
+     * @dev Price is indicated in USD $ in paymentUSDToken decimals
      * @param nft TangibleNFT contract reference.
      * @param paymentUSDToken Token being used as payment.
      * @param fingerprint product fingerprint.
@@ -105,6 +109,7 @@ contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
 
     /**
      * @notice This function fetches pricing data for an array of tokenIds.
+     * @dev Price is indicated in USD $ in paymentUSDToken decimals
      * @param nft TangibleNFT contract reference.
      * @param paymentUSDToken Token being used as payment.
      * @param tokenIds Array of tokenIds.
@@ -137,6 +142,7 @@ contract TangiblePriceManagerV2 is ITangiblePriceManager, FactoryModifiers {
     /**
      *
      * @notice This function fetches USD pricing data for tokenId.
+     * @dev Price is indicated in USD $ in paymentUSDToken decimals
      * @param nft TangibleNFT contract reference.
      * @param paymentUSDToken Token being used as payment.
      * @param tokenId tokenId to fetch the price for.

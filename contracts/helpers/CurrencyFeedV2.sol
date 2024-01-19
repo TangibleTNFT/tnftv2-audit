@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "../interfaces/ICurrencyFeedV2.sol";
 import "../abstract/FactoryModifiers.sol";
@@ -13,6 +13,15 @@ import "../abstract/FactoryModifiers.sol";
  *  for representing global currencies and countries.
  *      country codes: https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
  *      currency codes: https://en.wikipedia.org/wiki/ISO_4217
+ * It is also providing information that is complementary for the whole ecosystem to provide
+ * calculation from various currencies to US$. Stores oracle feeds so if anyone wants
+ * oracle for GBP all it need to provide is ISO code like 846.
+ * Also, to protect against ratio fluctuation between chain and real world, option
+ * for adding a premium on top of the exchange ratio is provided.
+ * Few notes:
+ *  - Feeds can be any verified oracle feed, from chainlink, dia, redstone etc.
+ *  - Premiums must be in decimals that are a match to the corresponding feed.(with same ISO)
+ *
  */
 contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
     // ~ State Variables ~
@@ -56,6 +65,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
 
     /**
      * @notice This method is used to update the state of `ISOcurrencyCodeToNum` and `ISOcurrencyNumToCode`.
+     * @dev Only factory owner can call this method.
      * @param _currency ISO-4217 alpha code. @dev I.e. if currency is Australian dollar, this value would be "AUD".
      * @param _currencyISONum ISO-4217 numeric code converted to integer. @dev I.e. if currency is Australian dollar, this value would be `36`).
      */
@@ -69,6 +79,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
 
     /**
      * @notice This method is used to update the state of `ISOcountryCodeToNum` and `ISOcountryNumToCode`.
+     * @dev Only factory owner can call this method.
      * @param _country ISO-3166 alpha code. @dev I.e. if country is Australia, this value would be "AUS".
      * @param _countryISONum ISO-3166 numeric code converted to integer. @dev I.e. if country is Australia, this value would be `36`.
      */
@@ -82,6 +93,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
 
     /**
      * @notice This method is used to update the state of `currencyPriceFeeds` and `currencyPriceFeedsISONum`.
+     * @dev Only factory owner can call this method.
      * @param _currency ISO-4217 alpha code. @dev I.e. if currency is Australian dollar, this value would be "AUD".
      * @param _priceFeed Price feed contract for the specified currency.
      */
@@ -97,6 +109,7 @@ contract CurrencyFeedV2 is ICurrencyFeedV2, FactoryModifiers {
 
     /**
      * @notice This method is used to update the state of `conversionPremiums` and `conversionPremiumsISONum`.
+     * @dev Only factory owner can call this method.
      * @param _currency ISO-4217 alpha code. @dev I.e. if currency is Australian dollar, this value would be "AUD".
      * @param _conversionPremium A premium taken by Tangible when exchanging 2 currencies. (i.e. gbp/usd rate is 1.34, premium is 0.01)
      */

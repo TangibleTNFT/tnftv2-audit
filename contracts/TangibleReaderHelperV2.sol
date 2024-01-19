@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/IFactory.sol";
 import "./interfaces/ITangibleMarketplace.sol";
@@ -8,7 +8,7 @@ import "./interfaces/IPassiveIncomeNFT.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title TangibleReaderHelper
+ * @title TangibleReaderHelperV2
  * @author Veljko Mihailovic
  * @notice This contract allows for batch reads to several Tangible contracts for various purposes.
  */

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity 0.8.21;
+pragma solidity ^0.8.23;
 
 /**
  * @title The Owned contract
@@ -102,20 +102,23 @@ interface AggregatorV3Interface {
 interface AggregatorV2V3Interface is AggregatorInterface, AggregatorV3Interface {}
 
 /**
- * @title External Access Controlled Aggregator Proxy
+ * @title UsdUsdOracle
  * @notice A trusted proxy for updating where current answers are read from
  * @notice This contract provides a consistent address for the
  * Aggregator and AggregatorV3Interface but delegates where it reads from to the owner, who is
  * trusted to update it.
  * @notice Only access enabled addresses are allowed to access getters for
  * aggregated answers and round information.
+ * @dev Implemented for the purpose of Tangible's price oracle system. Each currency
+ * has it's own price feed so technically, USD should have a price feed USD/USD.
+ * Of course, it is always 1, hence this contract.
  */
 contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
-
     int256 private constant ONE_INT256 = 1;
     uint80 private constant ONE_UINT80 = 1;
     uint256 private constant ONE_UINT256 = 1;
     uint8 private constant ZERO_UINT8 = 0;
+
     /**
      * We simply return 1 for the latest answer, to support
      * our flow in oracles when we do conversions from some other
@@ -146,6 +149,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
      * was computed.
      * (Only some AggregatorV3Interface implementations return meaningful values)
      * @dev Note that answer and updatedAt may change between queries.
+     * @dev Implemented in a way to support Tangible's price oracle system.
      */
     function latestRoundData()
         public
@@ -164,6 +168,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
 
     /**
      * @notice represents the number of decimals the aggregator responses represent.
+     * @dev Implemented in a way to support Tangible's price oracle system.
      */
     function decimals() external view override returns (uint8) {
         return ZERO_UINT8;
@@ -172,6 +177,7 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
     /**
      * @notice the version number representing the type of aggregator the proxy
      * points to.
+     * @dev Implemented in a way to support Tangible's price oracle system.
      */
     function version() external view override returns (uint256) {
         return ONE_UINT256;
@@ -179,27 +185,48 @@ contract UsdUsdOracle is AggregatorV2V3Interface, Owned {
 
     /**
      * @notice returns the description of the aggregator the proxy points to.
+     * @dev Implemented in a way to support Tangible's price oracle system.
      */
     function description() external view override returns (string memory) {
         return "USD/USD";
     }
 
+    /**
+     * @notice returns the current round ID.
+     * @dev Implemented in a way to support Tangible's price oracle system.
+     */
     function getAnswer(uint256 roundId) external view override returns (int256) {
         return ONE_INT256;
     }
 
+    /**
+     * @notice returns the timestamp of the last update to the data.
+     * @dev Implemented in a way to support Tangible's price oracle system.
+     */
     function getTimestamp(uint256 roundId) external view override returns (uint256) {
         return block.timestamp;
     }
 
+    /**
+     * @notice returns the current round ID.
+     * @dev Implemented in a way to support Tangible's price oracle system.
+     */
     function latestRound() external view override returns (uint256) {
         return ONE_UINT256;
     }
 
+    /**
+     * @notice returns the timestamp of the last update to the data.
+     * @dev Implemented in a way to support Tangible's price oracle system.
+     */
     function latestTimestamp() external view override returns (uint256) {
         return block.timestamp;
     }
 
+    /**
+     * @notice returns the current round ID and additional data.
+     * @dev Implemented in a way to support Tangible's price oracle system.
+     */
     function getRoundData(
         uint80 _roundId
     )

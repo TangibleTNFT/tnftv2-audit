@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "../interfaces/IPriceOracle.sol";
 import "../abstract/FactoryModifiers.sol";
@@ -8,9 +8,18 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "../interfaces/ICurrencyFeedV2.sol";
 
 /**
- * @title GoldOracleTangible
+ * @title GoldOracleTangibleV2
  * @author Veljko Mihailovic
  * @notice This smart contract is used to manage the stock and pricing for gold products for the gold TNFTs.
+ * @dev It has a IPriceOracle interface, which is created to fit the need of TNFT marketplace infrastructure,
+ * and to fill specifics of RWA products on chain.
+ * Interface is aligned with part of chainlink interface and extended with options
+ * to retrieve the price in native currency and USD$.
+ * Handling RWA is different from tokens in blockchain, vendors can come from different
+ * parts of the world with their native currency. We are required to be able to
+ * conform to USD price but, because ratios fluctuate in Forex, we also need to stora
+ * native currency price, so that we are sure that price of the item hasn't changed.
+ * For price feeds, every oracle depends on CurrencyFeedV2 contract.
  */
 contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers {
     // ~ State Variables ~
@@ -74,28 +83,17 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
 
     // ~ Functions ~
 
+    // ~ External Functions ~
+
+    /**
+     * @notice This method is used to update this contract with latest address
+     * of currency feed.
+     * @dev Only Tangible labs owner can call this method since it is our oracle implementation.
+     * @param _currencyFeed Address of price feed oracle.
+     */
     function updateCurrencyFeed(ICurrencyFeedV2 _currencyFeed) external onlyTangibleLabs {
         require(address(_currencyFeed) != address(0), "zero address");
         currencyFeed = _currencyFeed;
-    }
-
-    /**
-     * @notice This returns the latest USD value for gold using the price feed oracle.
-     * @param _fingerprint Product fingerprint to fetch GoldBar metadata.
-     * @return Returns USD price for grams of gold.
-     */
-    function _latestAnswer(uint256 _fingerprint) internal view returns (uint256) {
-        require(goldBars[_fingerprint].grams != 0, "fingerprint must exist");
-        AggregatorV3Interface priceFeed = currencyFeed.currencyPriceFeedsISONum(currencyISONum);
-        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeed.latestRoundData();
-        require(block.timestamp - _latestTimeStamp <= 1 days, "Stale XAU data");
-        if (price < 0) {
-            price = 0;
-        }
-
-        uint256 priceForGrams = ((toDecimals(goldBars[_fingerprint].grams, 0, _decimals()) *
-            uint256(price)) / toDecimals(unz, uint8(7), _decimals()));
-        return priceForGrams;
     }
 
     /**
@@ -120,15 +118,6 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
     }
 
     /**
-     * @notice Fetches decimals from price feed oracle.
-     * @return Returns the number of decimals the aggregator responses represent.
-     */
-    function _decimals() internal view returns (uint8) {
-        AggregatorV3Interface priceFeed = currencyFeed.currencyPriceFeedsISONum(currencyISONum);
-        return priceFeed.decimals();
-    }
-
-    /**
      * @notice View method for fetching oracle description.
      * @dev Inherited from IPriceOracle
      * @return desc -> Returns the description of the aggregator the proxy points to. (i.e. "GBP / USD").
@@ -149,7 +138,8 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
 
     /**
      * @notice This method decrements amount of a product is in available stock.
-     * @dev Is called after a purchase of this product.
+     * @dev It it called after a purchase of this product represented by fingerprint.
+     *  Only factory can call this method. Factory is acting as proxy here.
      * @param _fingerprint Product that is decrementing in stock.
      */
     function decrementSellStock(uint256 _fingerprint) external override onlyFactory {
@@ -171,6 +161,8 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
 
     /**
      * @notice This method returns the USD price data of a specified gold bar
+     * @dev This method is used to get the price of a single gold bar. Usefull to get the
+     * price of desired gold bar
      * @param _nft TangibleNFT contract reference.
      * @param _paymentUSDToken Token being used as payment.
      * @param _fingerprint Product identifier.
@@ -195,13 +187,15 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
 
     /**
      * @notice This method returns the USD prices data of a specified gold bars
+     * @dev This method is used to get the price of multiple gold bars. Useful for
+     * batch infor fetching.
      * @param _nft TangibleNFT contract reference.
-     * @param _paymentUSDToken Token being used as payment.
+     * @param _paymentUSDToken Token being used as payment. Used to convert to correct decimals
      * @param _fingerprints Product identifiers.
      * @param _tokenIds Token identifiers.
-     * @return weSellAt -> Prices of item in oracle, market price for corresponding _fingerprints or tokenIds.
+     * @return weSellAt -> Prices of item in oracle, rwa price, market price for corresponding _fingerprints or tokenIds.
      * @return weSellAtStock -> Stock of the item. (Quantity) for corresponding _fingerprints or tokenIds.
-     * @return tokenizationCost -> Tokenization costs for tokenizing asset. For gold, is 0.
+     * @return tokenizationCost -> Tokenization costs for tokenizing asset and bringing it on-chain. For gold, is 0.
      */
     function usdPrices(
         ITangibleNFT _nft,
@@ -251,6 +245,123 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
     }
 
     /**
+     * @notice This method allows the Tangible Labs multisig to add new gold bars
+     * @dev Only called by Tangible Labs multisig.
+     * @param _fingerprint Fingerprint product identifier.
+     * @param _grams Amount of grams of gold bar.
+     */
+    function addGoldBar(uint256 _fingerprint, uint256 _grams) external onlyTangibleLabs {
+        require(_grams != 0 && _fingerprint != 0, "Zeros");
+        goldBars[_fingerprint].grams = _grams;
+
+        emit GoldBarAdded(_fingerprint, _grams);
+    }
+
+    /**
+     * @notice This method allows the Tangible Labs multisig to update the stock of specific gold bars
+     * @dev Only called by Tangible Labs multisig.
+     * @param _fingerprint Fingerprint product identifier.
+     * @param _weSellAtStock New stock of product.
+     */
+    function addGoldBarStock(
+        uint256 _fingerprint,
+        uint256 _weSellAtStock
+    ) external onlyTangibleLabs {
+        GoldBar storage gb = goldBars[_fingerprint];
+        require(gb.grams != 0, "Bar not added");
+        emit GoldBarStockChanged(_fingerprint, gb.weSellAtStock, _weSellAtStock);
+
+        gb.weSellAtStock = _weSellAtStock;
+    }
+
+    /**
+     * @notice This method returns the native currency and grams of the gold bar
+     * @dev This method is used to get the price of a single gold bar.
+     * @param _fingerprint Product identifier.
+     * @return nativePrice -> Price of item in oracle, market price.
+     * @return currency -> Currency of the price.
+     */
+    function marketPriceNativeCurrency(
+        uint256 _fingerprint
+    ) external view returns (uint256 nativePrice, uint256 currency) {
+        currency = currencyISONum;
+        nativePrice = goldBars[_fingerprint].grams;
+    }
+
+    /**
+     * @notice This method returns the native currency and total price of the passed gold bars
+     * @dev This method is used to get the total price of multiple gold bars.
+     * @param _fingerprints Product identifiers.
+     * @return nativePrice -> Prices of item in oracle, market native price for corresponding _fingerprints.
+     * @return currency -> Currencies of the price for corresponding _fingerprints.
+     */
+    function marketPriceTotalNativeCurrency(
+        uint256[] calldata _fingerprints
+    ) external view returns (uint256 nativePrice, uint256 currency) {
+        uint256 length = _fingerprints.length;
+        currency = currencyISONum;
+
+        for (uint256 i; i < length; ) {
+            nativePrice += goldBars[_fingerprints[i]].grams;
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /**
+     * @notice This method returns the native prices ISO currencies for passed gold bars
+     * @dev This method is used to get arrays of prices and ISO currencies
+     * @param _fingerprints Product identifiers.
+     * @return nativePrices -> Prices of item in oracle, market native price for corresponding _fingerprints.
+     * @return currencies -> Currencies of the price for corresponding _fingerprints.
+     */
+    function marketPricesNativeCurrencies(
+        uint256[] calldata _fingerprints
+    ) external view returns (uint256[] memory nativePrices, uint256[] memory currencies) {
+        uint256 length = _fingerprints.length;
+        nativePrices = new uint256[](length);
+        currencies = new uint256[](length);
+        for (uint256 i; i < length; ) {
+            currencies[i] = currencyISONum;
+            nativePrices[i] = goldBars[_fingerprints[i]].grams;
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    // ~ Internal Functions ~
+
+    /**
+     * @notice Fetches decimals from price feed oracle.
+     * @return Returns the number of decimals the aggregator responses represent.
+     */
+    function _decimals() internal view returns (uint8) {
+        AggregatorV3Interface priceFeed = currencyFeed.currencyPriceFeedsISONum(currencyISONum);
+        return priceFeed.decimals();
+    }
+
+    /**
+     * @notice This returns the latest USD value for gold using the price feed oracle.
+     * @param _fingerprint Product fingerprint to fetch GoldBar metadata.
+     * @return Returns USD price for grams of gold.
+     */
+    function _latestAnswer(uint256 _fingerprint) internal view returns (uint256) {
+        require(goldBars[_fingerprint].grams != 0, "fingerprint must exist");
+        AggregatorV3Interface priceFeed = currencyFeed.currencyPriceFeedsISONum(currencyISONum);
+        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeed.latestRoundData();
+        require(block.timestamp - _latestTimeStamp <= 1 days, "Stale XAU data");
+        if (price < 0) {
+            price = 0;
+        }
+
+        uint256 priceForGrams = ((toDecimals(goldBars[_fingerprint].grams, 0, _decimals()) *
+            uint256(price)) / toDecimals(unz, uint8(7), _decimals()));
+        return priceForGrams;
+    }
+
+    /**
      * @notice This internal method returns the USD price data of a specified gold bar
      */
     function _usdPrice(
@@ -276,69 +387,5 @@ contract GoldOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers 
         weSellAtStock = goldBars[_fingerprint].weSellAtStock;
 
         return (weSellAt, weSellAtStock, tokenizationCost);
-    }
-
-    /**
-     * @notice This method allows the Tangible Labs multisig to add new gold bars
-     * @param _fingerprint Fingerprint product identifier.
-     * @param _grams Amount of grams of gold bar.
-     */
-    function addGoldBar(uint256 _fingerprint, uint256 _grams) external onlyTangibleLabs {
-        require(_grams != 0 && _fingerprint != 0, "Zeros");
-        goldBars[_fingerprint].grams = _grams;
-
-        emit GoldBarAdded(_fingerprint, _grams);
-    }
-
-    /**
-     * @notice This method allows the Tangible Labs multisig to update the stock of specific gold bars
-     * @param _fingerprint Fingerprint product identifier.
-     * @param _weSellAtStock New stock of product.
-     */
-    function addGoldBarStock(
-        uint256 _fingerprint,
-        uint256 _weSellAtStock
-    ) external onlyTangibleLabs {
-        GoldBar storage gb = goldBars[_fingerprint];
-        require(gb.grams != 0, "Bar not added");
-        emit GoldBarStockChanged(_fingerprint, gb.weSellAtStock, _weSellAtStock);
-
-        gb.weSellAtStock = _weSellAtStock;
-    }
-
-    function marketPriceNativeCurrency(
-        uint256 fingerprint
-    ) external view returns (uint256 nativePrice, uint256 currency) {
-        currency = currencyISONum;
-        nativePrice = goldBars[fingerprint].grams;
-    }
-
-    function marketPriceTotalNativeCurrency(
-        uint256[] calldata fingerprints
-    ) external view returns (uint256 nativePrice, uint256 currency) {
-        uint256 length = fingerprints.length;
-        currency = currencyISONum;
-
-        for (uint256 i; i < length; ) {
-            nativePrice += goldBars[fingerprints[i]].grams;
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function marketPricesNativeCurrencies(
-        uint256[] calldata fingerprints
-    ) external view returns (uint256[] memory nativePrices, uint256[] memory currencies) {
-        uint256 length = fingerprints.length;
-        nativePrices = new uint256[](length);
-        currencies = new uint256[](length);
-        for (uint256 i; i < length; ) {
-            currencies[i] = currencyISONum;
-            nativePrices[i] = goldBars[fingerprints[i]].grams;
-            unchecked {
-                ++i;
-            }
-        }
     }
 }

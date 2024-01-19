@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "./interfaces/ITangibleProfile.sol";
 
 /**
- * @title TangibleNFTDeployer
+ * @title TangibleProfile
  * @author Veljko Mihailovic
  * @notice This contract is used to track and manage user profiles from the front end.
  */

@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-v0.7/access/Ownable.sol";
  * @title TNGBLV3Oracle
  * @author Veljko Mihailovic
  * @notice Oracle reader contract, adjusted for TNGBL protocol. Uses the same logic as Uniswap V3 oracle example.
+ * @dev Logic is abstracted for our purposes and to fit our ecosystem.
  */
 contract TNGBLV3Oracle is Ownable {
     // ~ Constants ~

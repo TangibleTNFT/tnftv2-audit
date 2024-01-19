@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/ISellFeeDistributor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,9 +9,10 @@ import "./abstract/FactoryModifiers.sol";
 import "./interfaces/IExchange.sol";
 
 /**
- * @title SellFeeDistributor
+ * @title SellFeeDistributorV2
  * @author Veljko Mihailovic
- * @notice This contract collects fees and distributes it to the correct places; Burn or revenuShare. Fees are accrued here and taken from Marketplace transactions.
+ * @notice This contract collects fees and distributes it to the correct places;
+ * @dev All the fees are sent to revenueShare.
  */
 contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     using SafeERC20 for IERC20;
@@ -51,10 +52,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
         address _revenueToken
     ) external initializer {
         __FactoryModifiers_init(_factory);
-        require(
-            _revenueShare != address(0) && _revenueToken != address(0),
-            "ZA 0"
-        );
+        require(_revenueShare != address(0) && _revenueToken != address(0), "ZA 0");
         REVENUE_TOKEN = IERC20(_revenueToken);
         revenueShare = _revenueShare;
     }
@@ -92,7 +90,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     }
 
     /**
-     * @notice This method is used for the Factory owner to withdraw REVENUE_TOKEN from the contract.
+     * @notice This method is used for the Factory owner to withdraw any token from the contract.
      * @param _token Erc20 token to be witdrawn from this contract.
      */
     function withdrawToken(IERC20 _token) external onlyFactoryOwner {
@@ -109,11 +107,10 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     }
 
     /**
-     * @notice This method allocates an amount of tokens to the revenueShare contract and burns the rest.
+     * @notice This method allocates an amount of tokens to the revenueShare contract.
+     * @dev If passed token is not revenue token - swap to revenue token.
      * @param _paymentToken Erc20 token to take as payment.
      * @param _feeAmount Amount of `_paymentToken` being used for payment.
-     * @dev This method will exchange `_feeAmount` for REVENUE_TOKEN(if needed) and transfer that REVENUE_TOKEN
-     *      to the `revenueShare` contract.
      */
     function _distributeFee(IERC20 _paymentToken, uint256 _feeAmount) internal {
         // exchange payment token for REVENUE_TOKEN
@@ -130,6 +127,5 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
         //take everything and send to revenueShare
         REVENUE_TOKEN.safeTransfer(revenueShare, _feeAmount);
         emit FeeDistributed(revenueShare, _feeAmount);
-
     }
 }

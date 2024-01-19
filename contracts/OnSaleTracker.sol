@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/IOnSaleTracker.sol";
 
@@ -9,6 +9,8 @@ import "./abstract/FactoryModifiers.sol";
  * @title OnSaleTracker
  * @author Veljko Mihailovic
  * @notice This contract tracks the status of TNFTs listed on the Marketplace
+ * @dev This contract is used to track the status of TNFTs listed on the Marketplace.
+ *      Using this contract, it is easy to fetch all TNFTs that are listed for sale.
  */
 contract OnSaleTracker is IOnSaleTracker, FactoryModifiers {
     // ~ State Variables ~

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "../abstract/PriceConverter.sol";
 import "../interfaces/IPriceOracle.sol";
@@ -12,6 +12,19 @@ import "../interfaces/IRWAPriceNotificationDispatcher.sol";
  * @title RealtyOracleTangibleV2
  * @author Veljko Mihailovic
  * @notice This smart contract is used to manage the stock and pricing for Real Estate properties.
+ * @dev It has a IPriceOracle interface, which is created to fit the need of TNFT marketplace infrastructure,
+ * and to fill specifics of RWA products on chain.
+ * Interface is aligned with part of chainlink interface and extended with options
+ * to retrieve the price in native currency and USD$.
+ * Handling RWA is different from tokens in blockchain, vendors can come from different
+ * parts of the world with their native currency. We are required to be able to
+ * conform to USD price but, because ratios fluctuate in Forex, we also need to stora
+ * native currency price, so that we are sure that price of the item hasn't changed.
+ * For price feeds, every oracle depends on CurrencyFeedV2 contract.
+ * It holds the address of chainlink aggregator for real estates. Key link is the fingerprint.
+ * That oracle stores the info on where the house is located, price in native currency, when was the
+ * last update, stock of the item.
+ * Based on this info, different price feeds are fetched from CurrencyFeedV2 contract.
  */
 contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifiers {
     // ~ State Variables ~
@@ -34,19 +47,19 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     // ~ Events ~
 
     /**
-     *
+     * @notice This event is emitted when CurrencyFeed contract is updated.
      * @param currencyFeed Address of currency feed contract.
      */
     event CurrencyFeedUpdated(address indexed currencyFeed);
 
     /**
-     *
+     * @notice This event is emitted when ChainlinkRWAOracle contract is updated.
      * @param chainlinkRWAOracle Address of chainlink RWA oracle contract.
      */
     event ChainlinkOracleUpdated(address indexed chainlinkRWAOracle);
 
     /**
-     *
+     * @notice This event is emitted when NotificationDispatcher contract is updated.
      * @param notificationDispatcher Address of notification dispatcher contract.
      */
     event NotificationDispatcherUpdated(address indexed notificationDispatcher);
@@ -81,33 +94,11 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     // ~ Functions ~
 
-    /**
-     * @notice This method returns the exchange rate between native price and USD,
-     * @param nativePrice price in native currency, GBP.
-     * @param currencyISONum Numeric ISO code for currency
-     * @return Price in USD from native price provided, given the current exchange rate.
-     */
-    function convertNativePriceToUSD(
-        uint256 nativePrice,
-        uint16 currencyISONum
-    ) internal view returns (uint256) {
-        // take it differently from currency feed
-        AggregatorV3Interface priceFeedNativeToUSD = currencyFeed.currencyPriceFeedsISONum(
-            currencyISONum
-        );
-        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeedNativeToUSD.latestRoundData();
-        require(block.timestamp - _latestTimeStamp <= 1 days, "Stale currency feed");
-        if (price < 0) {
-            price = 0;
-        }
-        //add conversion premium
-        uint256 nativeToUSD = uint256(price) +
-            currencyFeed.conversionPremiumsISONum(currencyISONum);
-        return (nativePrice * nativeToUSD) / 10 ** uint256(priceFeedNativeToUSD.decimals());
-    }
+    // ~ External Functions ~
 
     /**
      * @notice This method returns the USD price data of a specified real estate asset.
+     * @dev Usefull for fetching the price of a property in USD, regardless of its location.
      * @param _nft TangibleNFT contract reference.
      * @param _paymentUSDToken Token being used as payment.
      * @param _fingerprint Property identifier.
@@ -132,6 +123,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method returns the USD prices data of a specified real estate assets.
+     * @dev Usefull for getting the USD price of multiple assets at once.
      * @param _nft TangibleNFT contract reference.
      * @param _paymentUSDToken Token being used as payment.
      * @param _fingerprints Product identifiers.
@@ -188,45 +180,6 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     }
 
     /**
-     * @notice This method returns the USD price data of a specified real estate asset.
-     */
-    function _usdPrice(
-        ITangibleNFT _nft,
-        IERC20Metadata _paymentUSDToken,
-        uint256 _fingerprint,
-        uint256 _tokenId
-    ) internal view returns (uint256 weSellAt, uint256 weSellAtStock, uint256 tokenizationCost) {
-        require(
-            (address(_nft) != address(0) && _tokenId != 0) || (_fingerprint != 0),
-            "Must provide fingerpeint or tokenId"
-        );
-        if (_fingerprint == 0) {
-            _fingerprint = _nft.tokensFingerprint(_tokenId);
-        }
-        uint8 localDecimals = chainlinkRWAOracle.getDecimals();
-
-        require(
-            _fingerprint != 0 && chainlinkRWAOracle.fingerprintExists(_fingerprint),
-            "fingerprint must exist"
-        );
-        IChainlinkRWAOracle.Data memory fingData = chainlinkRWAOracle.fingerprintData(_fingerprint);
-
-        tokenizationCost = toDecimals(
-            convertNativePriceToUSD(fingData.lockedAmount, fingData.currency),
-            localDecimals,
-            _paymentUSDToken.decimals()
-        );
-
-        weSellAt = toDecimals(
-            convertNativePriceToUSD(fingData.weSellAt, fingData.currency),
-            localDecimals,
-            _paymentUSDToken.decimals()
-        );
-
-        weSellAtStock = fingData.weSellAtStock;
-    }
-
-    /**
      * @notice This is a restricted function for updating the address of `currencyFeed`.
      * @param _currencyFeed New address to store in `currencyFeed`.
      */
@@ -256,6 +209,14 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
         emit NotificationDispatcherUpdated(_notificationDispatcher);
     }
 
+    /**
+     * @notice This function is used to send the price change to notification dispatcher
+     * @dev This function is called by the ChainlinkRWAOracle contract only.
+     * @param fingerprint Item ofr which the price has changed
+     * @param oldNativePrice old price of the item, native currency
+     * @param newNativePrice old price of the item, native currency
+     * @param currency Currency in which the price is expressed
+     */
     function notify(
         uint256 fingerprint,
         uint256 oldNativePrice,
@@ -270,6 +231,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This is a restricted function for decrementing the stock of a product/property.
+     * @dev Only callable by the Factory contract. Factory is proxy in this case.
      * @param _fingerprint Fingerprint to decrement.
      */
     function decrementSellStock(uint256 _fingerprint) external override onlyFactory {
@@ -286,7 +248,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method is used to fetch the native currency and price for a specified property.
-     * @dev This function will change interface when we redeploy.
+     * @dev Usefull for calculating the price of a property in native currency.
      * @param _fingerprint Property identifier.
      * @return nativePrice -> Price for property in native currency.
      * @return currency -> Native currency as ISO num code.
@@ -299,16 +261,23 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
         nativePrice = data.weSellAt + data.lockedAmount;
     }
 
+    /**
+     * @notice This method is used to fetch the native currency and price for a specified properties.
+     * @dev Usefull for calculating the total price of properties in native currency.
+     * @param _fingerprints Property identifiers.
+     * @return nativePrice -> Prices for properties in native currency.
+     * @return currency -> Native currencies as ISO num codes.
+     */
     function marketPriceTotalNativeCurrency(
-        uint256[] calldata fingerprints
+        uint256[] calldata _fingerprints
     ) external view returns (uint256 nativePrice, uint256 currency) {
-        uint256 length = fingerprints.length;
+        uint256 length = _fingerprints.length;
         require(length > 0, "no input");
-        IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(fingerprints[0]);
+        IChainlinkRWAOracle.Data memory data = chainlinkRWAOracle.fingerprintData(_fingerprints[0]);
         currency = data.currency;
         nativePrice += data.weSellAt + data.lockedAmount;
         for (uint256 i = 1; i < length; ) {
-            data = chainlinkRWAOracle.fingerprintData(fingerprints[i]);
+            data = chainlinkRWAOracle.fingerprintData(_fingerprints[i]);
             require(currency == data.currency, "not same currency");
 
             nativePrice += data.weSellAt + data.lockedAmount;
@@ -319,6 +288,13 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
         }
     }
 
+    /**
+     * @notice This method is used to fetch the native currency and price for a specified properties.
+     * @dev Usefull for getting individual prices in one call.
+     * @param fingerprints Property identifiers.
+     * @return nativePrices -> Prices for properties in native currency.
+     * @return currencies -> Native currencies as ISO num codes.
+     */
     function marketPricesNativeCurrencies(
         uint256[] calldata fingerprints
     ) external view returns (uint256[] memory nativePrices, uint256[] memory currencies) {
@@ -340,7 +316,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     }
 
     /**
-     * @notice This method returns the fingerprint from the TangibleOracle contract.
+     * @notice This method returns the fingerprint from the `chainlinkRWAOracle` at a specified index.
      * @param _index Index where the fingerprint resides.
      * @return fingerprint -> Product/property identifier.
      */
@@ -360,7 +336,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
     }
 
     /**
-     * @notice This method is used to fetch the last timestamp the oracle was updated.
+     * @notice This method is used to fetch the last timestamp the oracle was updated for specific fingerprint.
      * @param _fingerprint Product identifier.
      * @return Returns the block timestamp when the oracle was last updated.
      */
@@ -379,6 +355,8 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method returns the `latestPrices` var from `chainlinkRWAOracle` contract.
+     * @dev It is index that is incremented each time some price is updated.
+     * It is a signal to contracts tracking and copying the oracle data to know if they have the latest data.
      * @return Returns `latestPrices`var.
      */
     function latestPrices() public view returns (uint256) {
@@ -387,6 +365,7 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method retreives all oracle data for all fingerprints in the oracle.
+     * @dev Usefull to fetch all data in one go
      * @return currentData -> All metadata objects in an array.
      */
     function oracleDataAll() public view returns (IChainlinkRWAOracle.Data[] memory currentData) {
@@ -417,6 +396,8 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method returns an array of fingerprints supported by the oracle.
+     * @dev Usefull for fetching all fingerprints in one go. If some fingerptint is not supported,
+     * it means that it doesn't exists as far as the chain is concerned.
      * @return Array of fingerprints
      */
     function getFingerprints() external view returns (uint256[] memory) {
@@ -426,10 +407,77 @@ contract RealtyOracleTangibleV2 is IPriceOracle, PriceConverter, FactoryModifier
 
     /**
      * @notice This method is used to get the length of the oracle's fingerprints array.
+     * @dev For off-chain purposes
      * @return Num of fingerprints in the oracle aka length of fingerprints array.
      */
     function getFingerprintsLength() external view returns (uint256) {
         // return from chainlink oracle
         return chainlinkRWAOracle.getFingerprintsLength();
+    }
+
+    // ~ Internal Functions ~
+
+    /**
+     * @notice This method returns the exchange rate between native price and USD,
+     * @param nativePrice price in native currency, GBP.
+     * @param currencyISONum Numeric ISO code for currency
+     * @return Price in USD from native price provided, given the current exchange rate.
+     */
+    function _convertNativePriceToUSD(
+        uint256 nativePrice,
+        uint16 currencyISONum
+    ) internal view returns (uint256) {
+        // take it differently from currency feed
+        AggregatorV3Interface priceFeedNativeToUSD = currencyFeed.currencyPriceFeedsISONum(
+            currencyISONum
+        );
+        (, int256 price, , uint256 _latestTimeStamp, ) = priceFeedNativeToUSD.latestRoundData();
+        require(block.timestamp - _latestTimeStamp <= 1 days, "Stale currency feed");
+        if (price < 0) {
+            price = 0;
+        }
+        //add conversion premium
+        uint256 nativeToUSD = uint256(price) +
+            currencyFeed.conversionPremiumsISONum(currencyISONum);
+        return (nativePrice * nativeToUSD) / 10 ** uint256(priceFeedNativeToUSD.decimals());
+    }
+
+    /**
+     * @notice This method returns the USD price data of a specified real estate asset.
+     */
+    function _usdPrice(
+        ITangibleNFT _nft,
+        IERC20Metadata _paymentUSDToken,
+        uint256 _fingerprint,
+        uint256 _tokenId
+    ) internal view returns (uint256 weSellAt, uint256 weSellAtStock, uint256 tokenizationCost) {
+        require(
+            (address(_nft) != address(0) && _tokenId != 0) || (_fingerprint != 0),
+            "Must provide fingerpeint or tokenId"
+        );
+        if (_fingerprint == 0) {
+            _fingerprint = _nft.tokensFingerprint(_tokenId);
+        }
+        uint8 localDecimals = chainlinkRWAOracle.getDecimals();
+
+        require(
+            _fingerprint != 0 && chainlinkRWAOracle.fingerprintExists(_fingerprint),
+            "fingerprint must exist"
+        );
+        IChainlinkRWAOracle.Data memory fingData = chainlinkRWAOracle.fingerprintData(_fingerprint);
+
+        tokenizationCost = toDecimals(
+            _convertNativePriceToUSD(fingData.lockedAmount, fingData.currency),
+            localDecimals,
+            _paymentUSDToken.decimals()
+        );
+
+        weSellAt = toDecimals(
+            _convertNativePriceToUSD(fingData.weSellAt, fingData.currency),
+            localDecimals,
+            _paymentUSDToken.decimals()
+        );
+
+        weSellAtStock = fingData.weSellAtStock;
     }
 }

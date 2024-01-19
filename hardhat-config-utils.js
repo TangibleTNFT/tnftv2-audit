@@ -45,6 +45,23 @@ const networkConfig = {
         feeDistributor: '',
         chainlinkMatrixOracle: "",
     },
+    18231: {
+        name: 'unreal',
+        usdcAddress: '0xabAa4C39cf3dF55480292BBDd471E88de8Cc3C97',
+        usdtAddress: '',
+        usdrAddress: '',
+        ustbAddress: '',
+        pearlFactory: "0x6254c71Eae8476BE8fd0B9F14AEB61d578422991",
+        tangibleDao:"0xb99468CF65F43A2656280A749A3F092dF54AA58d", //rt deployer
+        tangibleLabs:"0x23bfB039Fe7fE0764b830960a9d31697D154F2E4", //goerli test
+        tokenUrl:"https://onu50475eh.execute-api.us-east-1.amazonaws.com/tnfts",
+        fetchExternal: "https://onu50475eh.execute-api.us-east-1.amazonaws.com",
+        tngblAddress:"0x86254FfaA70910447578E4aC37d51624409aeae3",
+        daiAddress:"0x665D4921fe931C0eA1390Ca4e0C422ba34d26169",
+        passiveNftAddress:"0x131995372479B06532ae2eba3794345CE6EcC2D1",
+        revenueShare:"0x177753854F244e08E69Ec199b313c3Ad85652E1c",
+        feeDistributor: "0xF8A1aD46057c546D2161198049367E4EDCEA6912" //revenue distributor
+    },
     80001: {
         name: 'mumbai',
         usdcAddress: '0x667269618f67f543d3121DE3DF169747950Deb13',
@@ -163,7 +180,9 @@ const tnftTypes = [
 
 const gbpConversionFee = 1000000;
 
-const developmentChains = ["hardhat", "localhost", "mumbai"]
+const blockConfirmations = process.env.BLOCK_CONFIRMATIONS || 0
+
+const developmentChains = ["hardhat", "localhost", "mumbai", "unreal"]
 const developmentChainsLocal = ["hardhat", "localhost"]
 
 const getNetworkIdFromName = async (networkIdName) => {
@@ -183,5 +202,6 @@ module.exports = {
     gold,
     realEstate,
     gbpConversionFee,
-    tnftTypes
+    tnftTypes,
+    blockConfirmations
 }

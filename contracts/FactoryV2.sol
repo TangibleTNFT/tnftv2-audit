@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./abstract/PriceConverter.sol";
 import "./interfaces/ITangibleMarketplace.sol";
@@ -13,16 +13,51 @@ import "./interfaces/ITangibleNFTDeployer.sol";
 import "./interfaces/IPriceOracle.sol";
 
 /**
- * @title Factory
+ * @title FactoryV2
  * @author Veljko Mihailovic
  * @notice Central factory contract for the Tangible protocol. Manages contract ownership and metadata for all
- *         peripheral contracts in the ecosystem. Also allows for the creation and management of new category Tangible NFTs.
+ *         peripheral contracts in the ecosystem.
+ * @dev Tangible ecosystem is a protocol in essence. Designed to be used by other vendors who wish
+ * to have the access to real world assets marketplace. The whole ecosystem has couple of sections
+ * between marketplace, TNFTs(which are chain representation of real world assets), oracles and TNFT management.
+ * At the sole center of it all is Factory contract. It's roles are following:
+ * - Deployer: Factory contract is the one that handles deployment of new TNFT categories - gold, real estates.
+ *  Litteraly anything can be brought on chain and tokenized.
+ *  -- As part of deploying new TNFTs, depending on their type(defined in TNFTMetadata contract), the Factory
+ *    can deploy RentManager contract that handles rents for the real estate type.
+ * - OwnerManagement: Fsince factory has it's owner, tangible labs, categoryOwners references, all of these access
+ * management roles are provided by Factory contract and are accessible to other contracts via FactoryModifiers
+ * - Metadata: has reference to TNFTMetadata contract, which is used to store metadata for TNFTs, and handles TNFT types,
+ *  and particular features of each type.
+ * - PriceManager: has reference to PriceManager contract, which is used to fetch prices in USD for each TNFT in the
+ * ecosystem, no matter who deployed it. Oracles(each vendor has their own with interface to follow) register to it, and it is good to go.
+ * - RentManagerDeployer: has reference to RentManagerDeployer contract, which is used to deploy RentManager contracts
+ * for each TNFT type that requires it.
+ * - Acts as a proxy between various contracts in the ecosystem. When someone buys unminted TNFT,
+ * through factory it is minted to the vendor, and then transferred to the marketplace and then yo buyer,
+ * taking care about decrementing the stock, calculating the storage fees if needed etc.
+ * - Is always approved by TNFT contract - to manage first purchases and to allow vendors
+ * to reclaim the assets if the owners are not paying storage for example(seize feature)
+ * - Has reference to the marketplace contract, which is used to sell the TNFTs.
+ * - Has reference to the baskets manager contract, which is used to create baskets of TNFTs. Baskets
+ * ecosystem is a separate ecosystem but it relies on the Factory and it's ownership management.
+ * - Handles approved tokens on the marketplace - which tokens are accepted as payment.
+ * - Handles whitelisting of buyers for unminted TNFTs.
+ * - Handles whitelisting of category minters and how much they can mint.
+ * - Handles whitelisting of fingerprint approvers.
+ * - Vendors have the ability to separate category owner to where the payment will go
+ * on the first purchase
+ * - On first purchase, it's the only one who has the right to mint
+ *
  */
 contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
     // ~ State Variables ~
 
-    /// @notice Default USD contract used for buying unminted tokens and paying for storage when required.
+    /**
+     * @notice Default USD contract used for buying unminted tokens and paying for storage when required.
+     * @dev If payment token in marketplace is not specified, defUSD is used.
+     */
     IERC20 public defUSD;
 
     /// @notice Mapping used to store the ERC20 tokens accepted as payment. If bool is true, token is accepted as payment.
@@ -62,12 +97,14 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     mapping(address => mapping(uint256 => uint256)) public numCategoriesToMint;
 
     /// @notice Manager of TNFT contract to approve fingerprints for new categories.
+    /// @dev Designed to be a multisig different from vendor to provide a 3rd party verification.
     mapping(ITangibleNFT => address) public fingerprintApprovalManager;
 
     /// @notice Mapping to map the owner EOA of a specified category for a TNFT contract.
     mapping(ITangibleNFT => address) public categoryOwner;
 
     /// @notice Mapping to map the payment wallet of category owner.
+    /// @dev Useful for protocols who want to split management and payment for their sales.
     mapping(address => address) public categoryOwnerPaymentAddress;
 
     /// @notice Maps category name to TNFT contract address.
@@ -86,7 +123,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     /// @notice The constant expiration date for each TNFT.
     uint256 public constant DEFAULT_SEIZE_DAYS = 180;
 
-    /// @notice Array of supported TNFTs
+    /// @notice Array of existing TNFTs(any tnft contract deployed in the ecosystem)
     ITangibleNFT[] private _tnfts;
 
     /// @notice Array of TNFTs owned by Tangible.
@@ -152,12 +189,6 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      * @param minter Address of deployer EOA or multisig.
      */
     event NewCategoryDeployed(address indexed tnft, address indexed minter);
-
-    /**
-     * @notice This event is emitted when a new category name is added to the category mapping with a tnft value.
-     * @param tnft address of tnft contract that is setting a new category name.
-     */
-    event CategoryMigrated(address indexed tnft);
 
     /**
      * @notice This event is emitted when a category owner is updated.
@@ -260,6 +291,8 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This onlyOwner function is used to update the defUSD state var.
+     * @dev Only settable after the token is acceptedd as payment token.
+     * @dev Only callable by the owner.
      * @param usd Erc20 contract to set as new defUSD.
      */
     function setDefaultStableUSD(IERC20 usd) external onlyOwner {
@@ -269,6 +302,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function is used to add a new payment token.
+     * @dev Only callable by the owner.
      * @param token Erc20 token to accept as payment method.
      * @param value If true, token is accepted, otherwise false.
      */
@@ -279,6 +313,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function is used to change wallet address, where payments will go.
+     * @dev Used by the category owners to change their payment wallet.
      * @param wallet address to where payment will go for msg.sender.
      */
     function configurePaymentWallet(address wallet) external {
@@ -365,6 +400,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This view function is used to return the array of TNFT contract addresses supported by the Factory.
+     * @dev Usefull to know all deployed TNFTs in the protocol
      * @return Array returned of type ITangibleNFT.
      */
     function getCategories() external view returns (ITangibleNFT[] memory) {
@@ -372,7 +408,17 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     }
 
     /**
-     * @notice This view function is used to return payment wallet that should be used for buyUnminted and storage payments.
+     * @notice This view function is used to return the array of TNFT contract addresses owned by Tangible.
+     * @dev Usefull to know all the TNFTs owned and deployed by Tangible.
+     * @return Array returned of type ITangibleNFT.
+     */
+    function getTangibleLabsCategories() external view returns (ITangibleNFT[] memory) {
+        return ownedByLabs;
+    }
+
+    /**
+     * @notice This view function is used to return payment wallet that should be used for buyUnminted and storage payments,
+     *  for specific category.
      * @return wallet address to be used as payment.
      */
     function categoryOwnerWallet(ITangibleNFT nft) external view returns (address wallet) {
@@ -381,7 +427,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This internal view function is used to return payment wallet that should be used for
-     * buyUnminted and storage payments.
+     *          buyUnminted and storage payments.
      * @return wallet address to be used as payment.
      */
     function _categoryOwnerWallet(ITangibleNFT nft) internal view returns (address wallet) {
@@ -394,6 +440,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This view function is used to see which TNFT contract needs to pay rent.
+     * @dev Useful to get the information if the TNFT contract needs to pay rent.
      * @param tnft contract.
      * @return If true, tnft holders receive rent share. Note: Tenants of Real Estate pay rent.
      */
@@ -412,7 +459,9 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows for a token holder to get a quote for storage costs and updates storage metadata.
-     * @dev This function is only callable by the Marketplace
+     * @dev Only callable by Marketplace contract. Factory is a proxy in this case, since
+     *      it has access to the information about the storage costs and can adjust the storage of
+     *      TNFT tokenId
      * @param tnft TangibleNFT contract.
      * @param paymentToken Erc20 token being accepted as payment.
      * @param tokenId Token identifier.
@@ -453,6 +502,8 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows the owner to set an approval manager EOA to the fingerprintApprovalManager mapping.
+     * @dev Used to make sure that 3rd party approves new items that vendor want to add to their
+     *      category.
      * @param tnft TangibleNFT contract.
      * @param _manager Manager EOA address.
      */
@@ -475,7 +526,8 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      * @dev Voucher is received and token(s) is minted to vendor (category owner)
      *      for proof of ownership then transferred to the marketplace so that it can be sold.
      *      Tokens are minted only on purchase.
-     *      Only tangibleLabs can mint tokens to sell.
+     *      Only tangibleLabs can mint tokens to sell and then put them on sale separatelly.
+     *      otherwise all "orders" come from marketplace.
      *      RealEstate TNFTs can be purchased only by whitelisted buyers.
      * @param voucher A mintVoucher is an unminted tNFT.
      */
@@ -550,6 +602,9 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows a category minter to create a new category of Tangible NFTs.
+     * @dev Only callable by a category minter. Minter is previously approved by the owner and
+     *    has a limit on which categories it can create, and how many. Tangible is not part of those
+     *    limits.
      * @param name Name of new TangibleNFT // category.
      * @param symbol Symbol of new TangibleNFT.
      * @param uri Base uri for NFT Metadata querying.
@@ -627,6 +682,8 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows a category owner to update the oracle for a category.
+     * @dev Only callable by the category owner. Every vendor is free to implement their own
+     * oracle for category, it just has to comply with our interface defined IPriceOracle.
      * @param name Category.
      * @param priceOracle Address of PriceOracle contract.
      */
@@ -640,9 +697,10 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         );
     }
 
-    /// @dev need to change, it should be whitelisting buyer per category of what is owner by category minter
     /**
-     * @notice This function allows for a category owner to assign a whitelisted buyer to mint
+     * @notice This function allows for a category owner to assign a whitelisted buyer for specific TNFT category.
+     * @dev Only callable by the category owner. If category requires whitelisting, it is responsibility
+     * of the category owner to whitelist buyers for his own categories.
      * @param tnft TangibleNFT contract that the `buyer` is/isnt whitelisted from.
      * @param buyer Address of whitelisted minter.
      * @param approved Status of whitelist. If true, `buyer` is whitelisted, otherwise false.
@@ -659,6 +717,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows for the contract owner to whitelist a minter of a certain category.
+     * @dev It also specifies how many categories minter is allowed to create.
      * @param minter Address to whitelist.
      * @param approved Status of whitelist. If true, able to mint. Otherwise false.
      * @param amount Amount of tokens the `minter` is allowed to mint.
@@ -680,6 +739,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This function allows a category owner to assign a whitelist status to a category.
+     * @dev If this is set, buyers must be whitelisted to purchase items the first time.
      * @param tnft TangibleNFT contract.
      * @param required Bool of whether or not whitelist is required to mint from the category.
      */
@@ -691,7 +751,8 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     }
 
     /**
-     * @notice This function allows the category owner to add a storage expiration to a category.
+     * @notice This function allows the category owner to set number of days before it can
+     *      seize the item, whose storage had expired.
      * @param tnft TangibleNFT contract.
      * @param numDays amount of days before storage expires.
      */
@@ -704,8 +765,11 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     }
 
     /**
-     * @notice This function allows a category owner to seize NFTs that are expired
-     * @dev If a token is expired, the storage has not been paid for.
+     * @notice This function allows a category owner to seize NFTs that whose storage has expired.
+     * @dev 2 types of seizing: one where storage is required and one where the tnft pays rent.
+     *     If storage has expired, owner can seize after daysBeforeSeize or DEFAULT_SEIZE_DAYS.
+     *     If tnft pays rent, owner can seize if the token is blacklisted.
+     * @dev To prevent this, owner can pay storage.
      * @param tnft TangibleNFT contract.
      * @param tokenIds Array of tokenIds to seize.
      */
@@ -743,7 +807,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
                 }
             }
         } else {
-            //for tnfts that have paid rent, we seize them
+            //for tnfts that have rent, we seize them
             //only if they are blacklisted
             for (uint256 i; i < length; ) {
                 uint256 token = tokenIds[i];

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/IRentManager.sol";
 import "./interfaces/IRentNotificationDispatcher.sol";
@@ -61,8 +61,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     // ~ Events ~
 
     /**
-     * @dev Emitted when rent is deposited for a token.
-     *
+     * @notice Emitted when rent is deposited for a token.
      * @param depositor The address of the user who deposited the rent.
      * @param tokenId The ID of the token for which rent was deposited.
      * @param rentToken The address of the token used to pay the rent.
@@ -76,8 +75,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     );
 
     /**
-     * @dev Emitted when rent is claimed for a token.
-     *
+     * @notice Emitted when rent is claimed for a token.
      * @param claimer The address of the user who claimed the rent.
      * @param nft The address of the NFT contract.
      * @param tokenId The ID of the token for which rent was claimed.
@@ -93,8 +91,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     );
 
     /**
-     * @dev Emitted when rent distribution is paused for token.
-     *
+     * @notice Emitted when rent distribution is paused for token.
      * @param rentToken Token used for the rent.
      * @param tokenId The tokenId for which we stopped distribution.
      * @param claimedBack The amount we claimed back when stopping the distribution.
@@ -185,9 +182,9 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Allows the rent depositor to deposit rent for a specific token.
+     * @notice Allows the rent depositor to deposit rent for a specific token.
      *
-     * This function requires the caller to be the current rent depositor.
+     * @dev This function requires the caller to be the current rent depositor.
      * It also checks whether the specified end time is in the future.
      * If the token's current rent token is either the zero address or the same as the provided token address,
      * the function allows the deposit.
@@ -272,7 +269,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Checks if distribution for specified tokenId is running or not.
+     * @notice Checks if distribution for specified tokenId is running or not.
+     * @dev Useful for checking if rent distro is stopped.
      * @param tokenId TokenId for which to check if rent distribution is running
      * @return True if running, false if not
      */
@@ -281,8 +279,9 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Pause distribution and claim back deposited amount. Claim for the owner.
-     *  Set rentInfo for token id to default values, except claimedAmountTotal.
+     * @notice Pause distribution and claim back deposited amount.
+     * @dev Claim for the owner.
+     *  Reset everything to default values, except claimedAmountTotal.
      * @param tokenId TokenId for which to check if rent distribution is paused
      * @return amount Amount that we claimed back
      */
@@ -312,10 +311,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Returns the amount of rent that can be claimed for a given token.
-     *
-     * The function calculates the claimable rent based on the rent info of the token.
-     *
+     * @notice Returns the amount of rent that can be claimed for a given token.
+     * @dev The function calculates the claimable rent based on the rent info of the token.
      * @param tokenId The ID of the token.
      * @return The amount of claimable rent for the token.
      */
@@ -324,10 +321,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Returns the amount of rent that can be claimed for a given token.
-     *
-     * The function calculates the claimable rents based on the rent info of the token.
-     *
+     * @notice Returns the amount of rent that can be claimed for a given tokens.
+     * @dev Returns the array of claimable rent for the tokens.
      * @param tokenIds The IDs of the tokens.
      * @return claimables The amounts of claimable rent per tokens.
      */
@@ -346,7 +341,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @notice Returns the rent info array for a given tokenIds.
+     * @notice Returns the rent info array and claimables for a given tokenIds.
      * @param tokenIds The IDs of the tokens.
      */
     function claimableRentInfoBatch(
@@ -364,10 +359,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Returns the total amount of rent that can be claimed for a given token.
-     *
-     * The function calculates the total claimable rent based on the rent info of the token.
-     *
+     * @notice Returns the total amount of rent that can be claimed for a given tokens.
+     * @dev The function calculates the total claimable rent based on the rent info of the tokens.
      * @param tokenIds The IDs of the tokens.
      * @return claimable The amount of claimable rent in total.
      */
@@ -384,6 +377,11 @@ contract RentManager is IRentManager, FactoryModifiers {
         return claimable;
     }
 
+    /**
+     * @notice Internal function that returns how much you can claim for the token
+     * @dev If distribution is not running, you can't claim anything.
+     * @param tokenId TokenId for which return the claimable rent
+     */
     function _claimableRentForToken(uint256 tokenId) internal view returns (uint256) {
         RentInfo storage rent = rentInfo[tokenId];
         if (!rent.distributionRunning) {
@@ -392,6 +390,10 @@ contract RentManager is IRentManager, FactoryModifiers {
         return rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
     }
 
+    /**
+     * @notice Internal function that returns how much you can claim for the token and whole rentInfo
+     * @param tokenId TokenId for which return the claimable rent
+     */
     function _claimableRentInfoForToken(
         uint256 tokenId
     ) internal view returns (uint256 claimable, RentInfo memory rInfo) {
@@ -403,9 +405,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Allows the owner of a token to claim their rent.
-     *
-     * The function first checks that the caller is the owner of the token.
+     * @notice Allows the owner of a token to claim their rent.
+     * @dev The function first checks that the caller is the owner of the token.
      * It then retrieves the amount of claimable rent for the token and requires that the amount is greater than zero,
      * and that the token is either not a TNFT.
      *
@@ -423,6 +424,11 @@ contract RentManager is IRentManager, FactoryModifiers {
         return _claimRentForToken(msg.sender, tokenId);
     }
 
+    /**
+     * @notice Allows the owner of a tokens to claim their rent.
+     * @dev Returns how much you have claimed for each token.
+     * @param tokenIds The IDs of the tokens.
+     */
     function claimRentForTokenBatch(
         uint256[] calldata tokenIds
     ) external returns (uint256[] memory claimed) {
@@ -443,6 +449,11 @@ contract RentManager is IRentManager, FactoryModifiers {
         return claimed;
     }
 
+    /**
+     * @notice Allows the owner of a tokens to claim their rent. Internal helper function.
+     * @param to To whom to send the rent
+     * @param tokenId TokenId for which to claim the rent
+     */
     function _claimRentForToken(
         address to,
         uint256 tokenId
@@ -476,9 +487,8 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Calculates the vested amount for a rent deposit - public function.
-     *
-     * If the current time is past the end time of the rent period, the function returns the deposit amount.
+     * @notice Calculates the vested amount for a rent deposit - public function.
+     * @dev If the current time is past the end time of the rent period, the function returns the deposit amount.
      * If the current time is before the end time of the rent period, the function calculates the vested amount based on
      * the elapsed time and the vesting duration.
      *
@@ -490,9 +500,9 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Calculates the vested amount for a rent deposit.
+     * @notice Calculates the vested amount for a rent deposit.
      *
-     * If the current time is past the end time of the rent period, the function returns the deposit amount.
+     * @dev If the current time is past the end time of the rent period, the function returns the deposit amount.
      * If the current time is before the end time of the rent period, the function calculates the vested amount based on
      * the elapsed time and the vesting duration.
      *
@@ -510,7 +520,7 @@ contract RentManager is IRentManager, FactoryModifiers {
     }
 
     /**
-     * @dev Returns number of days depending on a month in seconds.
+     * @notice Returns number of days depending on a month in seconds.
      *
      * @param month Enum representing on of 4 lengths of a month.
      * @return The number of seconds that each month has.

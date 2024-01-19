@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @title BalanceBatchReader
  * @author Veljko Mihailovic
  * @notice This contract is used to fetch multiple balances of a single token.
+ * @dev Helper contract as extension to Erc20 contract.
  */
 contract BalanceBatchReader {
     /**

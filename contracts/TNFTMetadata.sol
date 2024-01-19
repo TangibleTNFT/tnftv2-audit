@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/IFactory.sol";
 
@@ -8,7 +8,29 @@ import "./abstract/FactoryModifiers.sol";
 /**
  * @title TNFTMetadata
  * @author Veljko Mihailovic
- * @notice This contract is used to manage TangibleNFT metadata; Specifically Tnft types and features.
+ * @notice This contract is used to manage TangibleNFT metadata.
+ * @dev It handles types and features.
+ * We can have infinite number of types. But each type is unique and represents item type:
+ * - sneakers
+ * - cars
+ * - houses
+ * - gold
+ * - wint
+ * - etc
+ * Based on types, vendors can create a new category - category is instance of type. It is an
+ * actual TNFT contract. They are stored in Factory. So:
+ * - there can be only type (like real estate, sneakers)
+ * - but there can be infinite number of categories (TNFT contracts) for that type
+ * - - For example Adidas, Nike, nSport can have each own TNFT contract(category)
+ * - - Tangible, Company X etc can have each their own RealEstate TNFT contract(category)
+ * Features are used to describe TNFTs. They are stored in this contract. Each feature can belongs to
+ * a type(ocean house, luxury, blue). It can also exist acros various types(blue house, blue sneakers).
+ * Each feature has it's own id and it's description, and can be used across types.
+ *
+ * Both features and types must exist here, before they can be assigned to TNFT contract/tokenId
+ * Types are assigned to contracts, features are assigned to tokenIds.
+ * One unofficial feature that is not handled here, but in Oracles is location - house located
+ * in UK, sneakers in Australia etc..
  */
 contract TNFTMetadata is FactoryModifiers {
     // ~ State Variables ~
@@ -227,6 +249,9 @@ contract TNFTMetadata is FactoryModifiers {
         }
     }
 
+    /**
+     * @notice Helper function to find element in typeFeatures array.
+     */
     function _findElementIntypeFeatures(
         uint256 _type,
         uint256 _feature
@@ -303,12 +328,17 @@ contract TNFTMetadata is FactoryModifiers {
         return tnftTypesArray;
     }
 
+    /**
+     * @notice Returns information about feature.
+     * @param feature Feature we want to return the info for.
+     */
     function getFeatureInfo(uint256 feature) external view returns (FeatureInfo memory) {
         return featureInfo[feature];
     }
 
     /**
      * @notice This function is used to return the `typeFeatures` mapped array.
+     * @dev It returns all features that are added to specific type.
      * @param _tnftType The tnft type we want to return the array of features for.
      * @return Array of features.
      */
@@ -346,6 +376,30 @@ contract TNFTMetadata is FactoryModifiers {
     }
 
     /**
+     * @notice This function is used to return the descriptions of features array for TNFT type.
+     * @param _tnftType The tnft type we want to return the array of features for.
+     * @return desc Array of features descriptions.
+     * @return ids Array of features ids.
+     */
+    function getTNFTTypesFeaturesDescriptionsAndIds(
+        uint256 _tnftType
+    ) external view returns (string[] memory desc, uint256[] memory ids) {
+        uint256 length = typeFeatures[_tnftType].length;
+        uint256[] storage typeFeaturesArray = typeFeatures[_tnftType];
+        desc = new string[](length);
+        ids = new uint256[](length);
+
+        for (uint256 i; i < length; ) {
+            uint256 id = typeFeaturesArray[i];
+            desc[i] = featureInfo[id].description;
+            ids[i] = id;
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /**
      * @notice This function is used to return the `featureList` array.
      * @return Array of all features supported.
      */
@@ -376,5 +430,29 @@ contract TNFTMetadata is FactoryModifiers {
             }
         }
         return result;
+    }
+
+    /**
+     * @notice This function is used to return the descriptions of features array.
+     * @return desc Array of all features descriptions.
+     * @return ids Array of all features ids.
+     */
+    function getFeatureDescriptionsAndIds()
+        external
+        view
+        returns (string[] memory desc, uint256[] memory ids)
+    {
+        uint256 length = featureList.length;
+        desc = new string[](length);
+        ids = new uint256[](length);
+
+        for (uint256 i; i < length; ) {
+            uint256 id = featureList[i];
+            desc[i] = featureInfo[id].description;
+            ids[i] = id;
+            unchecked {
+                ++i;
+            }
+        }
     }
 }

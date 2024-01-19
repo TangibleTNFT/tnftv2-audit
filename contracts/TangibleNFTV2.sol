@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/IFactory.sol";
 
@@ -14,6 +14,34 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @title TangibleNFTV2
  * @author Veljko Mihailovic
  * @notice This is the Erc721 contract for the Tangible NFTs. Manages each asset's unique metadata and category.
+ * @dev The contract is designed in a way to fit the needs of the Tangible NFTs.
+ *
+ * Since the contract represent real world assets, couple of functions are added to support the real world use case.
+ * Those are:
+ * - `blacklistToken` -> used to blacklist a token if it is stolen or lost.
+ * - `setCustody` -> used to set custody of a token. If the asset is redeemed by the user, it is in our custody thus the NFT should not be sold.
+ * - `addMetadata` -> used to add metadata to a token. Metadata is used to describe the asset.(like beach house etc)
+ * - `removeMetadata` -> used to remove metadata from a token.
+ * - `addFingerprints` -> used to add fingerprints to the contract. Fingerprints are used to identify the asset. It is
+ * a unique identifier for the asset used across the whole Tangible ecosystem, both on-chain and off-chain.
+ * - `setStoragePricePerYear` -> used to set the price per year for storage.
+ * - `setStorageDecimals` -> used to set the decimal precision for storage price. Decimal is share between both percentage and fixed price.
+ * - `setStoragePercentPricePerYear` -> used to set the percentage price per year for storage.
+ * - `adjustStorage` -> used to adjust the storage expiration date for a token. Callable only by the Factory.
+ * - `toggleStorageFee` -> used to switch storage fee from fixed to percentage and vice versa.
+ * - `toggleStorageRequired` -> used to switch storage requirement on/off.
+ * - `setBaseURI` -> used to set the base URI for fetching metadata.
+ * - `togglePause` -> used to pause/unpause the contract. To prevent tokens misuse.
+ * - `produceMultipleTNFTtoStock` -> used to mint multiple TNFTs at once. Callable only by Factory
+ * - `burn` -> used to burn a token. Callable only by category owner when he owns the token.
+ * - `isStorageFeePaid` -> used to check if storage fee is paid for a token.
+ * - `blacklistedTokens` -> used to check if a token is blacklisted.
+ * - `tnftCustody` -> used to check if a token is in custody.
+ * - `isFingerprintApproved` -> used to check if a fingerprint is approved. Category owner can't just add new fingerprints, it must be
+ * approved by fingerprint approval manager.
+ *
+ * Each TangibleNFT belongs to a tnftType which is used to identify the type of products the TangibleNFT mints.
+ * There can be multiple categories that belong to the same type and they can belong to different vendors.
  */
 contract TangibleNFTV2 is
     ITangibleNFT,
@@ -44,9 +72,6 @@ contract TangibleNFTV2 is
     /// @notice Used to assign a unique tokenId identifier to each NFT minted.
     uint256 public lastTokenId;
 
-    /// @notice A mapping used to store the address of original token minters.
-    // mapping(uint256 => address) private _originalTokenOwners;
-
     /// @notice A mapping from tokenId to bool. If a tokenId is set to true.
     mapping(uint256 => bool) public blackListedTokens;
 
@@ -64,6 +89,7 @@ contract TangibleNFTV2 is
 
     /// @notice Identifier for product type
     /// @dev Categories are no longer unique, tnftType will be used to identify the type of products the TangibleNFT mints.
+    /// @dev There can be multiple categories that belong to the same type
     uint256 public tnftType;
 
     /// @notice Used to store the block timestamp when this contract was deployed.
@@ -268,7 +294,8 @@ contract TangibleNFTV2 is
 
     /**
      * @notice This method allows a category owner to set the custody status of a TNFT.
-     * @dev If the asset was redeemed, it is no longer in our custody thus the NFT should not be sold.
+     * @dev If the asset was redeemed, it should be in categroy owner custody.
+     * @dev It is advised for user to pass KYC before redeeming the asset.
      * @param tokenIds Array of tokenIds to update custody for.
      * @param inOurCustody If true, the NFT's asset is in our custody. Otherwise, false.
      */
@@ -292,6 +319,7 @@ contract TangibleNFTV2 is
 
     /**
      * @notice This function is used to update `storageDecimals`.
+     * @dev Decimals are shared between fixed and percentage price.
      * @param decimals New decimal precision for `storageDecimals`.
      */
     function setStorageDecimals(
@@ -324,6 +352,7 @@ contract TangibleNFTV2 is
 
     /**
      * @notice This function is used to update the storage expiration timestamp for a token.
+     * @dev Only callable by Factory. Factory is a proxy between markeptlace and TNFT contracts.
      * @param tokenId TNFT identifier.
      * @param _years Number of years to extend storage expiration.
      * @return If true, storage price is fixed
@@ -343,7 +372,8 @@ contract TangibleNFTV2 is
     }
 
     /**
-     * @notice This method allows a category owner to enable/disable storage fees
+     * @notice This method allows a category owner to switch fees between fixed and percentage.
+     * @dev If true, it is fixed, otherwise it is percentage.
      * @param value If true, there is a storage fee to be paid by TNFT holders.
      */
     function toggleStorageFee(bool value) external onlyCategoryOwner(ITangibleNFT(address(this))) {
@@ -364,7 +394,7 @@ contract TangibleNFTV2 is
 
     /**
      * @notice This function will push a new set of fingerprints to the fingeprintsInTnft array.
-     * @dev Only callable by Factory admin.
+     * @dev Only callable by Fingerprint approver manager.
      * @param fingerprints array of fingerprints to add.
      */
     function addFingerprints(uint256[] calldata fingerprints) external onlyFingerprintApprover {
@@ -458,9 +488,9 @@ contract TangibleNFTV2 is
     }
 
     /**
-     * @notice This function sets a tokenId to bool value in isBlacklisted mapping.
+     * @notice This function sets a tokenId to bool value in blacklistedTokens mapping.
      * @dev If value is set to true, tokenId will not be able to be transfered.
-     *      Function only callable by Factory admin.
+     *      Function only callable by Category owner.
      * @param tokenId TNFT identifier to be blacklisted.
      * @param blacklisted If true, tokenId will be blacklisted.
      */
@@ -474,7 +504,8 @@ contract TangibleNFTV2 is
 
     /**
      * @notice This method returns the contract's `symbol` appended to the `_baseUriLink`.
-     * @dev Will only return the symbol appended to baseUri if `symbolInUri` is true.
+     * @dev Will only return the symbol appended to baseUri if `symbolInUri` is true. Otherwise
+     * just _baseUriLink will be returned.
      * @return baseUri with appended symbol as a string.
      */
     function baseSymbolURI() external view returns (string memory) {
@@ -519,10 +550,21 @@ contract TangibleNFTV2 is
         return fingeprintsInTnft.length;
     }
 
+    /**
+     * @notice This method is used to return the minted tokens for specified fingerprint.
+     * @dev For example in gold, you can mint multiple tokens for the same fingerprint.
+     * @param fingerprint Fingerprint identifier to return tokens array for.
+     * @return Array of tokens for `fingerprint`.
+     */
     function getFingerprintTokens(uint256 fingerprint) external view returns (uint256[] memory) {
         return fingerprintTokens[fingerprint];
     }
 
+    /**
+     * @notice This method is used to return the length of the `fingerprintTokens` mapped array.
+     * @param fingerprint Fingerprint identifier to return tokens array length for.
+     * @return Length of the array.
+     */
     function getFingerprintTokensSize(uint256 fingerprint) external view returns (uint256) {
         return fingerprintTokens[fingerprint].length;
     }
@@ -609,7 +651,6 @@ contract TangibleNFTV2 is
         tokensFingerprint[tokenToMint] = fingerprint;
         //store token id to fingerprint
         fingerprintTokens[fingerprint].push(tokenToMint);
-        // _originalTokenOwners[tokenToMint] = to;
         tnftCustody[tokenToMint] = true;
 
         return tokenToMint;
@@ -682,6 +723,11 @@ contract TangibleNFTV2 is
         }
     }
 
+    /**
+     * @notice Internal function added in new ERC721 version
+     * @param account account to check balance for
+     * @param amount amount to increase balance for
+     */
     function _increaseBalance(
         address account,
         uint128 amount
@@ -697,7 +743,6 @@ contract TangibleNFTV2 is
     function _isStorageFeePaid(uint256 tokenId) internal view returns (bool) {
         // if you shouldn't pay storage, return true or if storage end time is in the future
         return !_shouldPayStorage() || storageEndTime[tokenId] > block.timestamp;
-
     }
 
     function _shouldPayStorage() internal view returns (bool) {

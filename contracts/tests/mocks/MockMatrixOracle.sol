@@ -1185,7 +1185,7 @@ interface ITangibleWrapper {
 
 // File: TangibleOracle.sol
 
-pragma solidity 0.8.21;
+pragma solidity ^0.8.23;
 
 /**
  * @title TangibleOracle

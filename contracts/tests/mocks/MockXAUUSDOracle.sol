@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 /**
  * @title The Owned contract
@@ -110,7 +110,7 @@ interface AggregatorV2V3Interface is AggregatorInterface, AggregatorV3Interface 
  * @notice Only access enabled addresses are allowed to access getters for
  * aggregated answers and round information.
  */
-contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
+contract EACAggregatorProxy is AggregatorV2V3Interface, Owned {
     /**
      * @notice Reads the current answer from aggregator delegated to.
      * @dev overridden function to add the checkAccess() modifier
@@ -121,7 +121,7 @@ contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
      * instead which includes better verification information.
      */
     function latestAnswer() public view override returns (int256) {
-        return 130000000;
+        return 178000000000;
     }
 
     /**
@@ -180,7 +180,7 @@ contract MockGBPUSDOracle is AggregatorV2V3Interface, Owned {
      * @notice returns the description of the aggregator the proxy points to.
      */
     function description() external view override returns (string memory) {
-        return "GBP/USD";
+        return "XAU/USD";
     }
 
     function getAnswer(uint256 roundId) external view override returns (int256) {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./interfaces/ITangibleMarketplace.sol";
 import "./interfaces/IRentManager.sol";
@@ -17,9 +17,26 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
- * @title Marketplace
+ * @title TNFTMarketplaceV2
  * @author Veljko Mihailovic
  * @notice This smart contract facilitates the buying and selling of Tangible NFTs.
+ * @dev This contract is used to buy and sell Tangible NFTs. It has couple of functions:
+ *   - `sell` -> Used to list a TNFT for sale. It has Batch version also.
+ *   - `buy` -> Used to buy a TNFT from the marketplace.
+ *   - `stopSelling` -> Used to stop selling a TNFT.
+ *   - `setFeeForCategory` -> Used to set the fee for a category of TNFTs. Fee is taken from
+ * the seller and only on second sales(buyUnminted is not affected).
+ *   - `setSellFeeAddress` -> Used to set the address where the fee is sent to.
+ *   - `setOnSaleTracker` -> Used to set the address of the OnSaleTracker contract. Helper contract
+ * that keeps track of which TNFTs are listed on the marketplace.
+ *   - `buyUnminted` -> Used to buy a unminted TNFT from the marketplace. It uses Factory as proxy
+ *  to mint the tnft, factory sends it to vendor, then marketplace and them marketplace sends it
+ * to buyer. If storage is required, it will be paid in the same transaction. User can specify how many years
+ * of storage he wants.
+ *   - `payStorage` -> Used to pay for storage of a TNFT(anyone can pay for any token).
+ *   - `setDesignatedBuyer` -> Used to set a designated buyer for a token. If you agree with someone to buy
+ * your item, designated buyer is the only one who can buy it.
+ *
  */
 contract TNFTMarketplaceV2 is
     ITangibleMarketplace,
@@ -31,6 +48,9 @@ contract TNFTMarketplaceV2 is
 
     // ~ State Variables ~
 
+    /**
+     * @notice This struct is used to help with stack too deep error.
+     */
     struct BuyHelper {
         address buyer;
         uint256 cost;
@@ -51,9 +71,11 @@ contract TNFTMarketplaceV2 is
 
     /// @notice This mapping is used to store the marketplace fees attached to each category of TNFTs.
     /// @dev The fees use 2 basis points for precision (i.e. 15% == 1500 // 2.5% == 250).
+    /// @dev If not set, the DEFAULT_SELL_FEE is used.
     mapping(ITangibleNFT => uint256) public feesPerCategory;
 
     /// @notice This mapping is used to store the initial sale status of each TNFT.
+    /// @dev If true, the TNFT has been sold at least once since minting.
     mapping(ITangibleNFT => mapping(uint256 => bool)) public initialSaleCompleted;
 
     // ~ Events ~
@@ -166,6 +188,20 @@ contract TNFTMarketplaceV2 is
         uint256 amount
     );
 
+    /**
+     * @notice This event is emitted when a designated buyer is set for a token.
+     * @param nft Address of TangibleNFT contract.
+     * @param tokenId NFT identifier.
+     * @param oldBuyer Previous designated buyer.
+     * @param newBuyer New designated buyer.
+     */
+    event DesignatedBuyer(
+        address indexed nft,
+        uint256 indexed tokenId,
+        address indexed oldBuyer,
+        address newBuyer
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -186,7 +222,9 @@ contract TNFTMarketplaceV2 is
     /**
      * @notice This function is used to list a batch of TNFTs at once instead of one at a time.
      * @dev This function allows anyone to sell a batch of TNFTs they own.
-     *      If `price` is 0, refer to the Pricing Oracle for the price.
+     *      If `price` is 0, purchase price is taken from the Oracle for the item.
+     *      If `designatedBuyer` is not 0 address, only that address can buy the item.
+     *      Callable by anyone who owns the tokens.
      * @param nft TangibleNFT contract reference.
      * @param paymentToken Erc20 token being used as payment.
      * @param tokenIds Array of tokenIds to sell.
@@ -250,6 +288,7 @@ contract TNFTMarketplaceV2 is
             lot.paymentToken = paymentToken;
         }
         if (designatedBuyer != address(0)) {
+            emit DesignatedBuyer(address(nft), tokenId, lot.designatedBuyer, designatedBuyer);
             lot.designatedBuyer = designatedBuyer;
         }
         emit Selling(
@@ -263,6 +302,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This is a restricted function for updating the `onSaleTracker` contract reference.
+     * @dev This function is only callable by the Factory contract owner.
      * @param _onSaleTracker The new OnSaleTracker contract.
      */
     function setOnSaleTracker(IOnSaleTracker _onSaleTracker) external onlyFactoryOwner {
@@ -272,6 +312,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This is a restricted function to update the `feesPerCategory` mapping.
+     * @dev This function is only callable by the Category owner.
      * @param tnft TangibleNFT contract reference aka category of TNFTs.
      * @param fee New fee to charge for category.
      */
@@ -282,6 +323,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This function allows a TNFT owner to stop the sale of their TNFTs batch.
+     * @dev User can stop multiple tokens sale at once.
      * @param nft TangibleNFT contract reference.
      * @param tokenIds Array of tokenIds.
      */
@@ -319,6 +361,8 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This function allows the user to buy any TangibleNFT that is listed on Marketplace.
+     * @dev If user is not designated buyer, he can't buy the token. If designated buyer is 0 address, anyone can buy.
+     * @dev User is protected against price manipulation.
      * @param nft TangibleNFT contract reference.
      * @param tokenId TNFT identifier.
      * @param _years Num of years to pay for storage.
@@ -353,6 +397,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice The function which buys additional storage for the token.
+     * @dev Anyone can extend storage for any token.
      * @param nft TangibleNFT contract reference.
      * @param paymentToken Erc20 token being used to pay for storage.
      * @param tokenId TNFT identifier.
@@ -365,7 +410,7 @@ contract TNFTMarketplaceV2 is
         uint256 tokenId,
         uint256 _years,
         uint256 _maxStorageAmount
-    ) external {
+    ) external nonReentrant {
         _payStorage(nft, paymentToken, tokenId, _years, _maxStorageAmount);
     }
 
@@ -402,7 +447,11 @@ contract TNFTMarketplaceV2 is
     }
 
     /**
-     * @notice This funcion allows accounts to purchase whitelisted tokens or receive vouchers for unminted tokens.
+     * @notice This funcion allows accounts to purchase items for the first time, that
+     *       were not previously minted.
+     * @dev Since we are dealing with real world assets, tokenizing them before actually selling
+     *      is not an option since those items either sit in a warehouse or are Real estate
+     *      properties. The process is explained in the docs and in the whitepaper.
      * @param nft TangibleNFT contract reference.
      * @param paymentToken Erc20 token being used as payment.
      * @param _fingerprint Fingerprint of token.
@@ -471,6 +520,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This function is used to return the price for the `data` item provided.
+     * @dev Fetches the price through Factory and PriceManager.
      * @param nft TangibleNFT contract reference.
      * @param paymentUSDToken Erc20 token being used as payment.
      * @param data Token identifier, will be a fingerprint or a tokenId.
@@ -503,6 +553,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice This internal function is used to update marketplace state when an account buys a listed TNFT.
+     * @dev Makes sure that tokens are transferred correctly and that fees are paid.
      * @param nft TangibleNFT contract reference.
      * @param tokenId TNFT identifier to buy.
      * @param chargeFee If true, a fee will be charged from buyer.
@@ -583,6 +634,7 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice Sets the sellFeeAddress
+     * @dev This function is only callable by the Factory contract owner.
      * @dev Will emit SellFeeAddressSet on change.
      * @param _sellFeeAddress A new address for fee storage.
      */
@@ -591,6 +643,14 @@ contract TNFTMarketplaceV2 is
         sellFeeAddress = _sellFeeAddress;
     }
 
+    /**
+     * @notice This function is used to set the designated buyer on already listed token.
+     * @dev Only seller or factory can call this function. Factory because of the first purchase.
+     * @dev If designatedBuyer is 0 address, anyone can buy the token.
+     * @param nft Address of the TNFT
+     * @param tokenId TokenId for which you want to set the designatedBuyer
+     * @param designatedBuyer address to set the designated buyer.
+     */
     function setDesignatedBuyer(
         ITangibleNFT nft,
         uint256 tokenId,
@@ -599,6 +659,7 @@ contract TNFTMarketplaceV2 is
         // gas optimization
         Lot storage _lot = marketplaceLot[address(nft)][tokenId];
         require(msg.sender == _lot.seller || msg.sender == factory(), "NATS");
+        emit DesignatedBuyer(address(nft), tokenId, _lot.designatedBuyer, designatedBuyer);
         _lot.designatedBuyer = designatedBuyer;
     }
 
@@ -626,6 +687,8 @@ contract TNFTMarketplaceV2 is
 
     /**
      * @notice Needed to receive Erc721 tokens.
+     * @dev Besides handling receiving of the ERC721 token, this function is used to list the token on the marketplace.
+     *      It has protection in place to make sure only tnft tokens can be listed.
      * @param seller Seller EOA address.
      * @param tokenId Unique token identifier that is being transferred.
      * @param data Additional data with no specified format.

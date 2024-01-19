@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.23;
 
 import "./TangibleNFTV2.sol";
 import "./interfaces/ITangibleNFTDeployer.sol";
@@ -8,9 +8,12 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 /**
- * @title TangibleNFTDeployer
+ * @title TangibleNFTDeployerV2
  * @author Veljko Mihailovic
  * @notice This contract is used to deploy new TangibleNFT contracts.
+ * @dev Implements Beacon proxy mechanism to deploy new TangibleNFT contracts.
+ * It is possible to upgrade TangibleNFT implementation when needed and it
+ * is reflected to all TangibleNFTs.
  */
 contract TangibleNFTDeployerV2 is ITangibleNFTDeployer, FactoryModifiers {
     /// notice tnft symbol => TangibleNFT beacon proxy address.
