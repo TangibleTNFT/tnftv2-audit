@@ -236,3 +236,43 @@ _It can be used by anyone. It relies on the UniV3 oracle to fetch the quote._
 | ---- | ---- | ----------- |
 | amountOut | uint256 | Amount of `tokenOut` tokens for quote. |
 
+### quoteOutWithSecondsAndDeviation
+
+```solidity
+function quoteOutWithSecondsAndDeviation(address tokenIn, address tokenOut, uint256 amountIn, uint32 secondsAgo, uint256 _percentageDeviation) external view returns (uint256 amountOut)
+```
+
+Same as quoteOut, but with seconds ago and percentage deviation provided
+as input parameters.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenIn | address | Address of Erc20 token being token from owner. |
+| tokenOut | address | Address of Erc20 token being given to the owner. |
+| amountIn | uint256 | Amount of `tokenIn` to be exchanged. |
+| secondsAgo | uint32 | Seconds ago for the oracle. |
+| _percentageDeviation | uint256 | Percentage deviation used on the oracle. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amountOut | uint256 | Amount of `tokenOut` tokens for quote. |
+
+### getFee
+
+```solidity
+function getFee(address tokenIn, address tokenOut) external view returns (uint24 fee)
+```
+
+This method is used to fetch a fee assigned to a token pair, previously stored.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenIn | address | Input token address. |
+| tokenOut | address | Output token address. |
+

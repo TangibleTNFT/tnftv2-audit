@@ -1250,6 +1250,53 @@ describe.only("TNFT Ecosystem", () => {
             expect(deplBalance < deplBalanceAfter).to.be.true;
         })
 
+        it("should buy house, whitelist buyer someone else",async () => {
+            const deplBalance = await usdc.balanceOf(tangibleLabs.address);
+            await factoryContract.connect(tangibleLabs).setRequireWhitelistCategory(realEstate, true);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(randomUser4.address);
+            await factoryContract.connect(randomUser4).whitelistBuyer(realEstate, randomUser.address, true);
+            const tx1 = await marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1, 0);
+            await tx1.wait();
+
+            await RealEstateNFT.connect(randomUser)["safeTransferFrom(address,address,uint256)"](randomUser.address, deployer.address, 0x01n);
+            const deplBalanceAfter = await usdc.balanceOf(tangibleLabs.address);
+            expect(deplBalance < deplBalanceAfter).to.be.true;
+        })
+
+        it("shouldn't whitelist, not whitelister category owner",async () => {
+            const deplBalance = await usdc.balanceOf(tangibleLabs.address);
+            await factoryContract.connect(tangibleLabs).setRequireWhitelistCategory(realEstate, true);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(randomUser4.address);
+            // await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(ethers.ZeroAddress);
+            // expect to fail next line
+            expect( factoryContract.connect(tangibleLabs).whitelistBuyer(realEstate, randomUser.address, true)).to.be.revertedWith("Caller is not category whitelister");
+            
+        })
+
+        it("shouldn't whitelist, removed whitelister",async () => {
+            const deplBalance = await usdc.balanceOf(tangibleLabs.address);
+            await factoryContract.connect(tangibleLabs).setRequireWhitelistCategory(realEstate, true);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(randomUser4.address);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(ethers.ZeroAddress);
+            // expect to fail next line
+            expect( factoryContract.connect(randomUser4).whitelistBuyer(realEstate, randomUser.address, true)).to.be.revertedWith("Caller is not category whitelister");
+            
+        })
+
+        it("should buy house,approve whitelister, then remove it",async () => {
+            const deplBalance = await usdc.balanceOf(tangibleLabs.address);
+            await factoryContract.connect(tangibleLabs).setRequireWhitelistCategory(realEstate, true);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(randomUser4.address);
+            await factoryContract.connect(tangibleLabs).configureWhitelisterWallet(ethers.ZeroAddress);
+            await factoryContract.connect(tangibleLabs).whitelistBuyer(realEstate, randomUser.address, true);
+            const tx1 = await marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1, 0);
+            await tx1.wait();
+
+            await RealEstateNFT.connect(randomUser)["safeTransferFrom(address,address,uint256)"](randomUser.address, deployer.address, 0x01n);
+            const deplBalanceAfter = await usdc.balanceOf(tangibleLabs.address);
+            expect(deplBalance < deplBalanceAfter).to.be.true;
+        })
+
         it("shouldn't buy house, storage is not required whitelist not allowed",async () => {
             await expect ( marketplace.connect(randomUser).buyUnminted(realEstate, usdc.target, 2320, 1, 0))
                 .to.be.revertedWith("OWL"); 

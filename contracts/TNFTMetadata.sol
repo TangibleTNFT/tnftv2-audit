@@ -384,8 +384,8 @@ contract TNFTMetadata is FactoryModifiers {
     function getTNFTTypesFeaturesDescriptionsAndIds(
         uint256 _tnftType
     ) external view returns (string[] memory desc, uint256[] memory ids) {
-        uint256 length = typeFeatures[_tnftType].length;
         uint256[] storage typeFeaturesArray = typeFeatures[_tnftType];
+        uint256 length = typeFeaturesArray.length;
         desc = new string[](length);
         ids = new uint256[](length);
 

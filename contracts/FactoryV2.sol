@@ -135,6 +135,10 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
     /// @notice Currency feed address
     address public currencyFeed;
 
+    /// @notice Mapping to map the whitelister wallet of category owner.
+    /// @dev Useful for protocols who want to split management and whitelising of buyers and automate.
+    mapping(address => address) public categoryOwnerWhitelisterAddress;
+
     // ~ Events ~
 
     /**
@@ -178,6 +182,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
 
     /**
      * @notice This event is emitted when the walet for payment is changed.
+     * @dev If 0 address is passed, owner is used as wallet.
      * @param owner Address owner which want to change his wallet for payments.
      * @param wallet Address of the wallet to use
      */
@@ -205,12 +210,27 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      */
     event ContractUpdated(uint256 indexed contractType, address oldAddress, address newAddress);
 
+    /**
+     * @notice This event is emitted when the whitelister wallet is changed.
+     * @dev If 0 address is passed, owner is used as whitelister.
+     * @param owner category owner address
+     * @param whitelister address to be used as whitelister. If 0, owner is used as whitelister
+     */
+    event WhitelisterChanged(address indexed owner, address whitelister);
+
     // ~ Modifiers ~
 
     /// @notice Modifier used to verify the function caller is the category owner.
     /// @param nft TangibleNFT contract reference.
     modifier onlyCategoryOwner(ITangibleNFT nft) {
         _checkCategoryOwner(nft);
+        _;
+    }
+
+    /// @notice Modifier used to verify the function caller is the category whitelister.
+    /// @param nft TangibleNFT contract reference.
+    modifier onlyCategoryWhitelister(ITangibleNFT nft) {
+        _checkCategoryWhitelister(nft);
         _;
     }
 
@@ -283,6 +303,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         tangibleLabs = _tangibleLabs;
         categoryMinter[_tangibleLabs] = true;
         categoryOwnerPaymentAddress[_tangibleLabs] = _tangibleLabs;
+        categoryOwnerWhitelisterAddress[_tangibleLabs] = _tangibleLabs;
 
         emit ContractUpdated(uint256(FACT_ADDRESSES.LABS), address(0), _tangibleLabs);
     }
@@ -317,9 +338,18 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      * @param wallet address to where payment will go for msg.sender.
      */
     function configurePaymentWallet(address wallet) external {
-        require(wallet != address(0), "no zero address");
         categoryOwnerPaymentAddress[msg.sender] = wallet;
         emit WalletChanged(msg.sender, wallet);
+    }
+
+    /**
+     * @notice This function is used to change address that is responsible for whitelisting.
+     * @dev Used by the category owners to change their whitelister wallet.
+     * @param whitelister address that is responsible for whitelisting.
+     */
+    function configureWhitelisterWallet(address whitelister) external {
+        categoryOwnerWhitelisterAddress[msg.sender] = whitelister;
+        emit WhitelisterChanged(msg.sender, whitelister);
     }
 
     /**
@@ -373,7 +403,11 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
             tangibleLabs = _contractAddress;
             // set payment wallet
             categoryOwnerPaymentAddress[_contractAddress] = categoryOwnerPaymentAddress[old];
+            categoryOwnerWhitelisterAddress[_contractAddress] = categoryOwnerWhitelisterAddress[
+                old
+            ];
             delete categoryOwnerPaymentAddress[old];
+            delete categoryOwnerWhitelisterAddress[old];
         } else if (_contractId == FACT_ADDRESSES.PRICE_MANAGER) {
             // 4
             old = address(priceManager);
@@ -435,6 +469,19 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         wallet = categoryOwnerPaymentAddress[_owner];
         if (wallet == address(0)) {
             wallet = _owner;
+        }
+    }
+
+    /**
+     * @notice This view function is used to return whitelister wallet that should be used for
+     *          whitelisting buyers for category.
+     * @return whitelister address to be used as whitelister.
+     */
+    function _categoryOwnerWhitelister(ITangibleNFT nft) internal view returns (address whitelister) {
+        address _owner = categoryOwner[nft];
+        whitelister = categoryOwnerWhitelisterAddress[_owner];
+        if (whitelister == address(0)) {
+            whitelister = _owner;
         }
     }
 
@@ -709,7 +756,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         ITangibleNFT tnft,
         address buyer,
         bool approved
-    ) external onlyCategoryOwner(tnft) {
+    ) external onlyCategoryWhitelister(tnft) {
         require(buyer != address(0), "Zero address");
         whitelistForBuyUnminted[tnft][buyer] = approved;
         emit WhitelistedBuyer(address(tnft), buyer, approved);
@@ -847,6 +894,16 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
         require(
             address(nft) != address(0) && categoryOwner[nft] == msg.sender,
             "Caller is not category owner"
+        );
+    }
+    /**
+     * @notice This internal method is used to check if msg.sender is a category whitelister.
+     * @dev Only called by modifier `onlyCategoryWhitelister`. Meant to reduce bytecode size
+     */
+    function _checkCategoryWhitelister(ITangibleNFT nft) internal view {
+        require(
+            address(nft) != address(0) && _categoryOwnerWhitelister(nft) == msg.sender,
+            "Caller is not category whitelister"
         );
     }
 }

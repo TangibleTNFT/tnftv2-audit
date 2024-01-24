@@ -258,4 +258,55 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
             swapRouter.fee
         );
     }
+
+    /**
+     * @notice Same as quoteOut, but with seconds ago and percentage deviation provided
+     * as input parameters.
+     * @param tokenIn Address of Erc20 token being token from owner.
+     * @param tokenOut Address of Erc20 token being given to the owner.
+     * @param amountIn Amount of `tokenIn` to be exchanged.
+     * @param secondsAgo    Seconds ago for the oracle.
+     * @param _percentageDeviation Percentage deviation used on the oracle.
+     * @return amountOut Amount of `tokenOut` tokens for quote.
+     */
+    function quoteOutWithSecondsAndDeviation(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint32 secondsAgo,
+        uint256 _percentageDeviation
+    ) external view returns (uint256 amountOut) {
+        bytes memory tokenized = abi.encodePacked(tokenIn, tokenOut);
+        SwapRouter memory swapRouter = routers[tokenized];
+
+        require(swapRouter.swap != address(0), "router 0 ng");
+        if (secondsAgo == 0) {
+            secondsAgo = DEFAULT_SECONDS_AGO;
+        }
+        // adjust the amountIn to the fee from pool
+        // adding 0.00001% more for slippage, because rounding errors
+        // I'm getting error too low output amount on exactInputSingle
+        amountIn =
+            amountIn -
+            ((amountIn * (swapRouter.fee + _percentageDeviation)) / oracle.POOL_FEE_100());
+
+        amountOut = oracle.consultWithFee(
+            tokenIn,
+            uint128(amountIn),
+            tokenOut,
+            secondsAgo,
+            swapRouter.fee
+        );
+    }
+
+    /**
+     * @notice This method is used to fetch a fee assigned to a token pair, previously stored.
+     * @param tokenIn Input token address.
+     * @param tokenOut Output token address.
+     */
+    function getFee(address tokenIn, address tokenOut) external view returns (uint24 fee) {
+        bytes memory tokenized = abi.encodePacked(tokenIn, tokenOut);
+        SwapRouter memory swapRouter = routers[tokenized];
+        fee = swapRouter.fee;
+    }
 }

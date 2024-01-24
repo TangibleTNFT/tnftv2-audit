@@ -237,6 +237,16 @@ address currencyFeed
 
 Currency feed address
 
+### categoryOwnerWhitelisterAddress
+
+```solidity
+mapping(address => address) categoryOwnerWhitelisterAddress
+```
+
+Mapping to map the whitelister wallet of category owner.
+
+_Useful for protocols who want to split management and whitelising of buyers and automate._
+
 ### WhitelistedBuyer
 
 ```solidity
@@ -314,6 +324,8 @@ event WalletChanged(address owner, address wallet)
 
 This event is emitted when the walet for payment is changed.
 
+_If 0 address is passed, owner is used as wallet._
+
 #### Parameters
 
 | Name | Type | Description |
@@ -367,6 +379,23 @@ This event is emitted when there is a peripherial contract address from FACT_ADD
 | oldAddress | address | Old contract address. |
 | newAddress | address | New contract address. |
 
+### WhitelisterChanged
+
+```solidity
+event WhitelisterChanged(address owner, address whitelister)
+```
+
+This event is emitted when the whitelister wallet is changed.
+
+_If 0 address is passed, owner is used as whitelister._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| owner | address | category owner address |
+| whitelister | address | address to be used as whitelister. If 0, owner is used as whitelister |
+
 ### onlyCategoryOwner
 
 ```solidity
@@ -374,6 +403,20 @@ modifier onlyCategoryOwner(contract ITangibleNFT nft)
 ```
 
 Modifier used to verify the function caller is the category owner.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nft | contract ITangibleNFT | TangibleNFT contract reference. |
+
+### onlyCategoryWhitelister
+
+```solidity
+modifier onlyCategoryWhitelister(contract ITangibleNFT nft)
+```
+
+Modifier used to verify the function caller is the category whitelister.
 
 #### Parameters
 
@@ -499,6 +542,22 @@ _Used by the category owners to change their payment wallet._
 | ---- | ---- | ----------- |
 | wallet | address | address to where payment will go for msg.sender. |
 
+### configureWhitelisterWallet
+
+```solidity
+function configureWhitelisterWallet(address whitelister) external
+```
+
+This function is used to change address that is responsible for whitelisting.
+
+_Used by the category owners to change their whitelister wallet._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| whitelister | address | address that is responsible for whitelisting. |
+
 ### setContract
 
 ```solidity
@@ -590,6 +649,21 @@ This internal view function is used to return payment wallet that should be used
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | wallet | address | address to be used as payment. |
+
+### _categoryOwnerWhitelister
+
+```solidity
+function _categoryOwnerWhitelister(contract ITangibleNFT nft) internal view returns (address whitelister)
+```
+
+This view function is used to return whitelister wallet that should be used for
+         whitelisting buyers for category.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| whitelister | address | address to be used as whitelister. |
 
 ### paysRent
 
@@ -893,4 +967,14 @@ function _checkCategoryOwner(contract ITangibleNFT nft) internal view
 This internal method is used to check if msg.sender is a category owner.
 
 _Only called by modifier `onlyCategoryOwner`. Meant to reduce bytecode size_
+
+### _checkCategoryWhitelister
+
+```solidity
+function _checkCategoryWhitelister(contract ITangibleNFT nft) internal view
+```
+
+This internal method is used to check if msg.sender is a category whitelister.
+
+_Only called by modifier `onlyCategoryWhitelister`. Meant to reduce bytecode size_
 
