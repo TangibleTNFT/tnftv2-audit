@@ -120,6 +120,7 @@ contract ExchangeV2 is IExchange, FactoryModifiers {
             _fee == oracle.POOL_FEE_001() ||
                 _fee == oracle.POOL_FEE_005() ||
                 _fee == oracle.POOL_FEE_03() ||
+                _fee == oracle.POOL_FEE_01() ||
                 _fee == oracle.POOL_FEE_1(),
             "invalid fee"
         );
