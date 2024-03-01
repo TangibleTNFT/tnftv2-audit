@@ -50,16 +50,15 @@ const networkConfig = {
         usdcAddress: '0xabAa4C39cf3dF55480292BBDd471E88de8Cc3C97',
         usdtAddress: '',
         usdrAddress: '',
-        ustbAddress: '0x18c50039C9a9F4CFeB027e592d489253e2cfd07B',
-        pearlFactory: "0xf2A5DD9ff3aA93807986DeAA9fD316471BD959Cd",
-        pearlRouter: "0x906B62A0C2ef082408A9DEBb0FC09027B351A04c",
+        ustbAddress: '0x83feDBc0B85c6e29B589aA6BdefB1Cc581935ECD',
+        pearlFactory: "0x5A9aA74caceede5eAbBeDE2F425faEB85fdCE2f2",
+        pearlRouter: "0x4b15F7725a6B0dbb51421220c445fE3f57Bfca8b",
         tangibleDao:"0xb99468CF65F43A2656280A749A3F092dF54AA58d", //rt deployer
         tangibleLabs:"0x23bfB039Fe7fE0764b830960a9d31697D154F2E4", //goerli test
         tokenUrl:"https://onu50475eh.execute-api.us-east-1.amazonaws.com/tnfts",
         fetchExternal: "https://onu50475eh.execute-api.us-east-1.amazonaws.com",
         daiAddress:"0x665D4921fe931C0eA1390Ca4e0C422ba34d26169",
-        passiveNftAddress:"0x0000000000000000000000000000000000000001",
-        revenueShare:"0x0000000000000000000000000000000000000001",
+        feeDistributor:"0x56843df02d5A230929B3A572ACEf5048d5dB76db",
         feeDistributor: "0xa443Bf2fCA2119bFDb97Bc01096fBC4F1546c8Ae", //revenue distributor
     },
     80001: {

@@ -1,45 +1,5 @@
 # Solidity API
 
-## RevenueShare
-
-### claimForToken
-
-```solidity
-function claimForToken(address contractAddress, uint256 tokenId) external
-```
-
-### share
-
-```solidity
-function share(bytes token) external view returns (int256)
-```
-
-### updateShare
-
-```solidity
-function updateShare(address contractAddress, uint256 tokenId, int256 amount) external
-```
-
-### unregisterContract
-
-```solidity
-function unregisterContract(address contractAddress) external
-```
-
-### total
-
-```solidity
-function total() external view returns (uint256)
-```
-
-## RentShare
-
-### forToken
-
-```solidity
-function forToken(address contractAddress, uint256 tokenId) external returns (contract RevenueShare)
-```
-
 ## IFactory
 
 ### mint

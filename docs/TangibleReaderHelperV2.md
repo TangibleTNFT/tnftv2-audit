@@ -12,26 +12,10 @@ contract IFactory factory
 
 Stores a reference to the Factory contract.
 
-### passiveNft
-
-```solidity
-contract IPassiveIncomeNFT passiveNft
-```
-
-Stores a reference to the passiveNFT contract.
-
-### revenueShare
-
-```solidity
-contract RevenueShare revenueShare
-```
-
-Stores a reference to the revenueShare contract.
-
 ### constructor
 
 ```solidity
-constructor(contract IFactory _factory, contract IPassiveIncomeNFT _passiveNft, contract RevenueShare _revenueShare) public
+constructor(contract IFactory _factory) public
 ```
 
 Initializes TangibleReaderHelper
@@ -41,70 +25,6 @@ Initializes TangibleReaderHelper
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | _factory | contract IFactory | Factory contract reference. |
-| _passiveNft | contract IPassiveIncomeNFT | PassiveNFT contract reference. |
-| _revenueShare | contract RevenueShare | RevenueShare contract reference. |
-
-### getLocksBatch
-
-```solidity
-function getLocksBatch(uint256[] tokenIds) external view returns (struct IPassiveIncomeNFT.Lock[] locksBatch)
-```
-
-This method fetches a batch of lock data given an array of `tokenIds`.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenIds | uint256[] | Array of token identifiers. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| locksBatch | struct IPassiveIncomeNFT.Lock[] | -> Array of Lock data for each tokenId provided. |
-
-### getSharesBatch
-
-```solidity
-function getSharesBatch(uint256[] tokenIds, address fromAddress) external view returns (int256[] sharesBatch, uint256 totalShare)
-```
-
-This method is used to fetch a batch of rev shares for each tokenId provided.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenIds | uint256[] | Array of tokenIds. |
-| fromAddress | address | TangibleNFT contract. TODO: Verify |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| sharesBatch | int256[] | -> Array of shares |
-| totalShare | uint256 | -> Total shares. |
-
-### getPiNFTMarketItemBatch
-
-```solidity
-function getPiNFTMarketItemBatch(uint256[] tokenIds) external view returns (struct IMarketplace.MarketItem[] marketItems)
-```
-
-This method returns MarketItem data for each tokenId provided.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenIds | uint256[] | Array of token identifiers |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| marketItems | struct IMarketplace.MarketItem[] | -> Array of MarketItem objects for each tokenId provided. |
 
 ### ownersOBatch
 

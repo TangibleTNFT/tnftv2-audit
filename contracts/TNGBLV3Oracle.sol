@@ -2,8 +2,30 @@
 pragma solidity ^0.7.6;
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+import "@openzeppelin/contracts-v0.7/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-v0.7/access/Ownable.sol";
+
+/**
+ * @dev Interface for the optional metadata functions from the ERC20 standard.
+ */
+interface IERC20Metadata is IERC20 {
+    /**
+     * @dev Returns the name of the token.
+     */
+    function name() external view returns (string memory);
+
+    /**
+     * @dev Returns the symbol of the token.
+     */
+    function symbol() external view returns (string memory);
+
+    /**
+     * @dev Returns the decimals places of the token.
+     */
+    function decimals() external view returns (uint8);
+}
 
 /**
  * @title TNGBLV3Oracle
@@ -136,6 +158,25 @@ contract TNGBLV3Oracle is Ownable {
         uint24 fee
     ) external view returns (uint256 amountOut) {
         amountOut = _consultWithFee(tokenIn, amountIn, tokenOut, secondsAgo, fee);
+    }
+
+    /**
+     * @dev Get token quote at given tick.
+     * @param tokenIn Input token address.
+     * @param tokenOut Output token address.
+     * @param fee Pool fee.
+     */
+    function getQuoteAtCurrentTick(
+        address tokenIn,
+        address tokenOut,
+        uint24 fee
+    ) external view returns (uint256 quoteAmount) {
+        address _pool = _fetchPool(tokenIn, tokenOut, fee);
+        require(_pool != address(0), "pool doesn't exist");
+        (,int24 tick,,,,,) = IUniswapV3Pool(_pool).slot0();
+        uint8 decimalsIn = IERC20Metadata(tokenIn).decimals();
+        uint128 amountIn = uint128(10)**decimalsIn;
+        quoteAmount = OracleLibrary.getQuoteAtTick(tick, amountIn, tokenIn, tokenOut);
     }
 
     function _consultWithFee(

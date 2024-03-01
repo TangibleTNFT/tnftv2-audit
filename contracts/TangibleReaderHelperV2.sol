@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import "./interfaces/IFactory.sol";
 import "./interfaces/ITangibleMarketplace.sol";
 import "./interfaces/IMarketplace.sol";
-import "./interfaces/IPassiveIncomeNFT.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -18,96 +17,21 @@ contract TangibleReaderHelperV2 {
     /// @notice Stores a reference to the Factory contract.
     IFactory public immutable factory;
 
-    /// @notice Stores a reference to the passiveNFT contract.
-    IPassiveIncomeNFT public immutable passiveNft;
-
-    /// @notice Stores a reference to the revenueShare contract.
-    RevenueShare public immutable revenueShare;
-
     // ~ Constructor ~
 
     /**
      * @notice Initializes TangibleReaderHelper
      * @param _factory Factory contract reference.
-     * @param _passiveNft PassiveNFT contract reference.
-     * @param _revenueShare RevenueShare contract reference.
      */
-    constructor(IFactory _factory, IPassiveIncomeNFT _passiveNft, RevenueShare _revenueShare) {
+    constructor(IFactory _factory) {
         require(
-            address(_factory) != address(0) &&
-                address(_passiveNft) != address(0) &&
-                address(_revenueShare) != address(0),
+            address(_factory) != address(0),
             "ZA 0"
         );
         factory = _factory;
-        passiveNft = _passiveNft;
-        revenueShare = _revenueShare;
     }
 
     // ~ Functions ~
-
-    /**
-     * @notice This method fetches a batch of lock data given an array of `tokenIds`.
-     * @param tokenIds Array of token identifiers.
-     * @return locksBatch -> Array of Lock data for each tokenId provided.
-     */
-    function getLocksBatch(
-        uint256[] calldata tokenIds
-    ) external view returns (IPassiveIncomeNFT.Lock[] memory locksBatch) {
-        uint256 length = tokenIds.length;
-        locksBatch = new IPassiveIncomeNFT.Lock[](length);
-
-        for (uint256 i; i < length; ) {
-            locksBatch[i] = passiveNft.locks(tokenIds[i]);
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /**
-     * @notice This method is used to fetch a batch of rev shares for each tokenId provided.
-     * @param tokenIds Array of tokenIds.
-     * @param fromAddress TangibleNFT contract. TODO: Verify
-     * @return sharesBatch -> Array of shares
-     * @return totalShare -> Total shares.
-     */
-    function getSharesBatch(
-        uint256[] calldata tokenIds,
-        address fromAddress
-    ) external view returns (int256[] memory sharesBatch, uint256 totalShare) {
-        uint256 length = tokenIds.length;
-        sharesBatch = new int256[](length);
-
-        totalShare = revenueShare.total();
-
-        for (uint256 i; i < length; ) {
-            sharesBatch[i] = revenueShare.share(abi.encodePacked(fromAddress, tokenIds[i]));
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /**
-     * @notice This method returns MarketItem data for each tokenId provided.
-     * @param tokenIds Array of token identifiers
-     * @return marketItems -> Array of MarketItem objects for each tokenId provided.
-     */
-    function getPiNFTMarketItemBatch(
-        uint256[] calldata tokenIds
-    ) external view returns (IMarketplace.MarketItem[] memory marketItems) {
-        uint256 length = tokenIds.length;
-        marketItems = new IMarketplace.MarketItem[](length);
-        IMarketplace piMarketplace = passiveNft.marketplace();
-
-        for (uint256 i; i < length; ) {
-            marketItems[i] = piMarketplace._idToMarketItem(tokenIds[i]);
-            unchecked {
-                ++i;
-            }
-        }
-    }
 
     /**
      * @notice This function takes an array of `tokenIds` and fetches the array of owners.

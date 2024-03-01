@@ -162,16 +162,6 @@ describe.only("TNFT Ecosystem", () => {
         mockrouter = await MockRouter.deploy();
         await mockrouter.waitForDeployment();
 
-        //deploy mockPassiveNft
-        const MockPassiveIncomeNFT = await ethers.getContractFactory("MockPassiveIncomeNFT");
-        mockPassiveNft = await MockPassiveIncomeNFT.deploy();
-        await mockPassiveNft.waitForDeployment();
-
-        //deploy mockRevenueShare
-        const MockRevenueShare = await ethers.getContractFactory("MockRevenueShare");
-        mockRevenueShare = await MockRevenueShare.deploy();
-        await mockRevenueShare.waitForDeployment();
-
         //deploy Exchange
         const Exchange = await ethers.getContractFactory("ExchangeV2");
         exchange = await upgrades.deployProxy(Exchange, [factoryContract.target, mockrouter.target]);
@@ -222,7 +212,7 @@ describe.only("TNFT Ecosystem", () => {
 
         //deploy SellFeeDistributor
         const SellFeeDistributor = await ethers.getContractFactory("SellFeeDistributorV2");
-        sellFeeDistributor = await upgrades.deployProxy(SellFeeDistributor, [factoryContract.target, mockRevenueShare.target, usdc.target]);
+        sellFeeDistributor = await upgrades.deployProxy(SellFeeDistributor, [factoryContract.target, mockRevenueShare.address, usdc.target]);
         await sellFeeDistributor.waitForDeployment();
         await sellFeeDistributor.setExchange(exchange.target);
 
@@ -265,13 +255,13 @@ describe.only("TNFT Ecosystem", () => {
         await factoryContract.setContract(1, tnftDeployer.target);
         await factoryContract.setContract(0, marketplace.target);
         await factoryContract.setContract(5, tnftMetadata.target);
-        await factoryContract.setContract(6, mockRevenueShare.target);
+        await factoryContract.setContract(6, mockRevenueShare.address);
         await factoryContract.setContract(4, priceManager.target);
         await factoryContract.setContract(2, rentDeployer.target);
         
         //deploy tangible reader helper
         const TRH = await ethers.getContractFactory("TangibleReaderHelperV2");
-        tangibleReaderHelper = await TRH.deploy(factoryContract.target, mockPassiveNft.target, mockRevenueShare.target);
+        tangibleReaderHelper = await TRH.deploy(factoryContract.target);
         await tangibleReaderHelper.waitForDeployment();
 
         // set tnft metadata
@@ -362,7 +352,7 @@ describe.only("TNFT Ecosystem", () => {
     }
     
     beforeEach(async () => {
-        [deployer, tangibleLabs, vendorWine, operator, randomUser, feeSellAddress, feeStorageAddress, randomUser2, randomUser3, randomUser4]=await ethers.getSigners();
+        [deployer, tangibleLabs, vendorWine, operator, randomUser, feeSellAddress, feeStorageAddress, randomUser2, randomUser3, randomUser4, mockRevenueShare]=await ethers.getSigners();
         
         await loadFixture(deployContracts);
         //do some money minting and approval
@@ -1002,7 +992,7 @@ describe.only("TNFT Ecosystem", () => {
             const lAnswer = await priceManager.itemPriceBatchTokenIds(goldTnft,usdc.target,[0x01n]);
             const oraclePrice = lAnswer[0][0] + lAnswer[2][0];
 
-            const feeBalance = await usdc.balanceOf(mockRevenueShare.target);
+            const feeBalance = await usdc.balanceOf(mockRevenueShare.address);
             const tokenOwner = await GoldNFT.ownerOf(0x01n);
             //first number is gold price second is storage fee of the price
             expect(paidPriceEvent).eq(lAnswer.weSellAt[0] + lAnswer.tokenizationCost[0])
@@ -1040,7 +1030,7 @@ describe.only("TNFT Ecosystem", () => {
             const lAnswer = await priceManager.itemPriceBatchTokenIds(goldTnft,usdc.target,[0x01n]);
             const oraclePrice = lAnswer[0][0] + lAnswer[2][0];
 
-            const feeBalance = await usdc.balanceOf(mockRevenueShare.target);
+            const feeBalance = await usdc.balanceOf(mockRevenueShare.address);
             const tokenOwner = await GoldNFT.ownerOf(0x01n);
             //first number is gold price second is storage fee of the price
             expect(paidPriceEvent).eq(lAnswer.weSellAt[0] + lAnswer.tokenizationCost[0])
@@ -1095,7 +1085,7 @@ describe.only("TNFT Ecosystem", () => {
             const lAnswer = await priceManager.itemPriceBatchTokenIds(goldTnft,usdr.target,[0x01n]);
             const oraclePrice = lAnswer[0][0] + lAnswer[2][0];
 
-            const feeBalance = await usdc.balanceOf(mockRevenueShare.target);
+            const feeBalance = await usdc.balanceOf(mockRevenueShare.address);
             const tokenOwner = await GoldNFT.ownerOf(0x01n);
             //first number is gold price second is storage fee of the price
             expect(paidPriceEvent).eq(lot[0].price)

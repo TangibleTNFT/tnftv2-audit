@@ -66,6 +66,16 @@ module.exports = {
         },
       },
       {
+        version: "0.8.21",
+        settings: {
+          evmVersion: 'shanghai',
+          optimizer: {
+            enabled: true,
+            runs: 2000,
+          },
+        },
+      },
+      {
         version: "0.7.6",
         settings: {
           optimizer: {
@@ -113,5 +123,9 @@ module.exports = {
   typechain: {
     outDir: "types",
     target: "ethers-v6",
+  // },
+  // sourcify: {
+  //   enabled: true
   }
+  
 };

@@ -6,22 +6,6 @@ import "./ITangiblePriceManager.sol";
 import "./IRentManager.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface RevenueShare {
-    function claimForToken(address contractAddress, uint256 tokenId) external;
-
-    function share(bytes memory token) external view returns (int256);
-
-    function updateShare(address contractAddress, uint256 tokenId, int256 amount) external;
-
-    function unregisterContract(address contractAddress) external;
-
-    function total() external view returns (uint256);
-}
-
-interface RentShare {
-    function forToken(address contractAddress, uint256 tokenId) external returns (RevenueShare);
-}
-
 /// @title IFactory interface defines the interface of the Factory which creates TNFTs.
 interface IFactory is IVoucher {
     /// @dev The function which does lazy minting.

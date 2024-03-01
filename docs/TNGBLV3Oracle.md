@@ -1,5 +1,33 @@
 # Solidity API
 
+## IERC20Metadata
+
+_Interface for the optional metadata functions from the ERC20 standard._
+
+### name
+
+```solidity
+function name() external view returns (string)
+```
+
+_Returns the name of the token._
+
+### symbol
+
+```solidity
+function symbol() external view returns (string)
+```
+
+_Returns the symbol of the token._
+
+### decimals
+
+```solidity
+function decimals() external view returns (uint8)
+```
+
+_Returns the decimals places of the token._
+
 ## TNGBLV3Oracle
 
 Oracle reader contract, adjusted for TNGBL protocol. Uses the same logic as Uniswap V3 oracle example.
@@ -172,6 +200,22 @@ _Returns amountOut for given amountIn. Accepts custom fee parameter_
 | amountIn | uint128 | Amount of tokenIn. |
 | tokenOut | address | Address of tokenOut. |
 | secondsAgo | uint32 | Seconds ago tells how much in the past to look. |
+| fee | uint24 | Pool fee. |
+
+### getQuoteAtCurrentTick
+
+```solidity
+function getQuoteAtCurrentTick(address tokenIn, address tokenOut, uint24 fee) external view returns (uint256 quoteAmount)
+```
+
+_Get token quote at given tick._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenIn | address | Input token address. |
+| tokenOut | address | Output token address. |
 | fee | uint24 | Pool fee. |
 
 ### _consultWithFee

@@ -1268,6 +1268,7 @@ contract MockMatrixOracle is ChainlinkClient, ConfirmedOwner, AutomationCompatib
         }
     }
 
+
     /**
      * @dev Writes new item data to the contract.
      */
