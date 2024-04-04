@@ -31,7 +31,7 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
     // ~ Events ~
 
     /// @notice This event is emitted when fees are distributed.
-    event FeeDistributed(address indexed to, uint256 usdcAmount);
+    event FeeDistributed(address indexed to, address indexed paymentToken, uint256 usdcAmount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -113,19 +113,9 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      * @param _feeAmount Amount of `_paymentToken` being used for payment.
      */
     function _distributeFee(IERC20 _paymentToken, uint256 _feeAmount) internal {
-        // exchange payment token for REVENUE_TOKEN
-        if (address(_paymentToken) != address(REVENUE_TOKEN)) {
-            //we need to convert the payment token to REVENUE_TOKEN
-            _paymentToken.approve(address(exchange), _feeAmount);
-            _feeAmount = exchange.exchange(
-                address(_paymentToken),
-                address(REVENUE_TOKEN),
-                _feeAmount,
-                exchange.quoteOut(address(_paymentToken), address(REVENUE_TOKEN), _feeAmount)
-            );
-        }
-        //take everything and send to revenueShare
-        REVENUE_TOKEN.safeTransfer(revenueShare, _feeAmount);
-        emit FeeDistributed(revenueShare, _feeAmount);
+        uint256 balance = _paymentToken.balanceOf(address(this));
+        _feeAmount = _feeAmount > balance ? balance : _feeAmount;
+        _paymentToken.safeTransfer(revenueShare, _feeAmount);
+        emit FeeDistributed(revenueShare, address(_paymentToken), _feeAmount);
     }
 }
