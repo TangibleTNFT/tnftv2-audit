@@ -7,6 +7,7 @@ import "./interfaces/IWETH9.sol";
 import "./interfaces/ISellFeeDistributor.sol";
 import "./interfaces/IOnSaleTracker.sol";
 import "./interfaces/IVoucher.sol";
+import "./interfaces/IUSTB.sol";
 
 import "./abstract/FactoryModifiers.sol";
 
@@ -661,6 +662,19 @@ contract TNFTMarketplaceV2 is
         require(msg.sender == _lot.seller || msg.sender == factory(), "NATS");
         emit DesignatedBuyer(address(nft), tokenId, _lot.designatedBuyer, designatedBuyer);
         _lot.designatedBuyer = designatedBuyer;
+    }
+
+    /**
+     * @dev Function to disable rebasing of tngbl foundation tokens.
+     * @param _token The address of the rebasing token.
+     * @param _disable True if we want to disable rebase, false if we want to enable it.
+     */
+    function disableRebaseOfToken(
+        address _token,
+        bool _disable
+    ) external onlyFactoryOwner {
+        require(_token != address(0), "Token address cannot be 0");
+        IUSTB(_token).disableRebase(address(this), _disable);
     }
 
     /**

@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "./abstract/FactoryModifiers.sol";
 import "./interfaces/IExchange.sol";
+import "./interfaces/IUSTB.sol";
 
 /**
  * @title SellFeeDistributorV2
@@ -104,6 +105,19 @@ contract SellFeeDistributorV2 is ISellFeeDistributor, FactoryModifiers {
      */
     function distributeFee(IERC20 _paymentToken, uint256 _feeAmount) external {
         _distributeFee(_paymentToken, _feeAmount);
+    }
+
+    /**
+     * @dev Function to disable rebasing of tngbl foundation tokens.
+     * @param _token The address of the rebasing token.
+     * @param _disable True if we want to disable rebase, false if we want to enable it.
+     */
+    function disableRebaseOfToken(
+        address _token,
+        bool _disable
+    ) external onlyFactoryOwner {
+        require(_token != address(0), "Token address cannot be 0");
+        IUSTB(_token).disableRebase(address(this), _disable);
     }
 
     /**

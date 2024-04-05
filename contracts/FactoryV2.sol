@@ -218,6 +218,13 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      */
     event WhitelisterChanged(address indexed owner, address whitelister);
 
+    /**
+     * @notice This event is emitted when the default USD token is updated.
+     * @param oldAddress Old default USD token address.
+     * @param newAddress New default USD token address.
+     */
+    event DefaultUSDToken(address indexed oldAddress, address indexed newAddress);
+
     // ~ Modifiers ~
 
     /// @notice Modifier used to verify the function caller is the category owner.
@@ -318,6 +325,7 @@ contract FactoryV2 is IFactory, PriceConverter, Ownable2StepUpgradeable {
      */
     function setDefaultStableUSD(IERC20 usd) external onlyOwner {
         require(paymentTokens[usd], "NAPP");
+        emit DefaultUSDToken(address(defUSD), address(usd));
         defUSD = usd;
     }
 

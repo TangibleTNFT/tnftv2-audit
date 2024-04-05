@@ -231,7 +231,11 @@ contract RentManager is IRentManager, FactoryModifiers {
         // with this we ensure to put rent only when everything is vested
         require(rent.endTime < block.timestamp, "Not completely vested");
 
+        uint256 balance = IERC20(tokenAddress).balanceOf(msg.sender);
         IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 balanceAfter = IERC20(tokenAddress).balanceOf(msg.sender);
+        // just in case it's rebase token, set the proper taken amount
+        amount = balance - balanceAfter;
 
         if (rent.rentToken == address(0)) {
             rent.rentToken = tokenAddress;
@@ -481,7 +485,18 @@ contract RentManager is IRentManager, FactoryModifiers {
             rent.claimedAmount += claimableRent;
             rent.claimedAmountTotal += claimableRent;
         }
+        uint256 balance = IERC20(rent.rentToken).balanceOf(address(this));
         IERC20(rent.rentToken).safeTransfer(to, claimableRent);
+        uint256 balanceAfter = IERC20(rent.rentToken).balanceOf(address(this));
+        if((balance - balanceAfter) < claimableRent) {
+            // if we have a difference it's rebasing token and, we need to adjust
+            // rentInfo
+            uint256 diff = claimableRent - (balance - balanceAfter);
+            rent.claimedAmount -= diff;
+            rent.claimedAmountTotal -= diff;
+            claimableRent -= diff;
+        }
+
 
         emit RentClaimed(to, TNFT_ADDRESS, tokenId, rent.rentToken, claimableRent);
     }
