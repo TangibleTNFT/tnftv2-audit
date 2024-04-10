@@ -402,7 +402,7 @@ contract RentManager is IRentManager, FactoryModifiers {
         uint256 tokenId
     ) internal view returns (uint256 claimable, RentInfo memory rInfo) {
         RentInfo storage rent = rentInfo[tokenId];
-        if (rInfo.distributionRunning) {
+        if (rent.distributionRunning) {
             claimable = rent.unclaimedAmount + _vestedAmount(rent) - rent.claimedAmount;
             rInfo = rent;
         }
